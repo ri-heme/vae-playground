@@ -1,0 +1,9 @@
+# Compiled bytecode
+__pycache__/
+*.py[cod]
+
+# Jupyter NB checkpoints
+.ipynb_checkpoints/
+
+# Distribution and packaging files
+*.egg-info/
