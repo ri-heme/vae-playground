@@ -11,7 +11,7 @@ def compute_kl_div(z: torch.Tensor, qz_loc: torch.Tensor, qz_scale: torch.Tensor
     """Computes the KL divergence between posterior q(z|x) and prior p(z). The
     prior has a Normal(0, 1) distribution."""
     qz = Normal(qz_loc, qz_scale)
-    pz = Normal(torch.zeros_like(qz_loc), torch.ones_like(qz_scale))
+    pz = Normal(0, 1)
     kl_div: torch.Tensor = qz.log_prob(z) - pz.log_prob(z)
     return kl_div.sum(-1)
 
@@ -29,8 +29,9 @@ def compute_gaussian_log_prob(
 
 def compute_elbo(model: nn.Module, batch: torch.Tensor) -> torch.Tensor:
     """Computes the evidence lower bound objective."""
-    x, = batch
-    px_loc, z, qz_loc, qz_scale = model(batch)
+    x, _ = batch
+    px_loc, z, qz_loc, qz_logvar = model(batch)
+    qz_scale = (0.5 * qz_logvar).exp()
     reg_loss = compute_kl_div(z, qz_loc, qz_scale)
     rec_loss = compute_gaussian_log_prob(x, px_loc)
     elbo = (reg_loss - rec_loss).mean()

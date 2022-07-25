@@ -12,12 +12,14 @@ class VAE(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
 
-    def reparametrize(self, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
+    @staticmethod
+    def reparametrize(mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
         scale = (0.5 * logvar).exp()
         return Normal(mu, scale).rsample()
 
     def forward(self, batch: torch.Tensor) -> Tuple[torch.Tensor, ...]:
-        mu, logvar = self.encoder(batch)
+        x, _ = batch
+        mu, logvar = self.encoder(x)
         z = self.reparametrize(mu, logvar)
         recon = self.decoder(z)
         return recon, z, mu, logvar
