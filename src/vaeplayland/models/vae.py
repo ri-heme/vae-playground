@@ -3,6 +3,7 @@ from typing import Tuple
 import torch
 from torch import nn
 from torch.autograd import Variable
+from torch.distributions import Normal
 
 
 class VAE(nn.Module):
@@ -12,12 +13,11 @@ class VAE(nn.Module):
         self.decoder = decoder
 
     def reparametrize(self, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
-        std = logvar.mul(0.5).exp_()
-        eps = Variable(std.new_empty().normal_())
-        return eps.mul(std).add_(mu)
+        scale = (0.5 * logvar).exp()
+        return Normal(mu, scale).rsample()
 
     def forward(self, batch: torch.Tensor) -> Tuple[torch.Tensor, ...]:
         mu, logvar = self.encoder(batch)
         z = self.reparametrize(mu, logvar)
         recon = self.decoder(z)
-        return recon, mu, logvar
+        return recon, z, mu, logvar
