@@ -17,7 +17,7 @@ def compute_kl_div(z: torch.Tensor, qz_loc: torch.Tensor, qz_scale: torch.Tensor
 
 
 def compute_gaussian_log_prob(
-    x:torch.Tensor, px_loc: torch.Tensor, px_scale: Optional[torch.Tensor] = None
+    x: torch.Tensor, px_loc: torch.Tensor, px_scale: Optional[torch.Tensor] = None
 ) -> torch.Tensor:
     """Computes the log of the probability density of the likelihood p(x|z)."""
     if px_scale is None:
