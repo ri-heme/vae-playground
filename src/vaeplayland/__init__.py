@@ -1,4 +1,4 @@
 __version__ = (0, 0, 0)
-__all__ = ["models"]
+__all__ = ["data", "models"]
 
-from vaeplayland import models
+from vaeplayland import data, models
