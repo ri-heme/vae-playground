@@ -26,16 +26,14 @@ def calculate_output_shape(
     """
     output_shape = ()
     for d in range(2):
-        output_shape += (
-            input_shape[d] + (2 * padding - kernel_size) // stride + 1,
-        )
+        output_shape += ((input_shape[d] + (2 * padding - kernel_size)) // stride + 1,)
     return output_shape
 
 
 class ImageEncoder(nn.Module):
     def __init__(self, input_shape: Tuple[int, int], num_latent_units: int) -> None:
-        """Parametrizes q(z|x). Architecture originally described in 
-        `Wu & Goodman (2018) <https://arxiv.org/abs/1802.05335>`_, see 
+        """Parametrizes q(z|x). Architecture originally described in
+        `Wu & Goodman (2018) <https://arxiv.org/abs/1802.05335>`_, see
         Figure 8.
 
         Parameters
