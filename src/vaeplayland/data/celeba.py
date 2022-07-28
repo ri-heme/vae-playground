@@ -1,6 +1,7 @@
 __all__ = ["get_dataloader"]
 
 from pathlib import Path
+from typing import Optional
 
 from torch.utils.data import DataLoader
 from torchvision import transforms as T
@@ -11,7 +12,7 @@ IMAGE_SIZE = 64
 NORMALIZE_PARAMS = ((0.5,) * 3,) * 2
 
 
-def get_dataloader(split: str = "train", **dataloader_kwargs) -> DataLoader:
+def get_dataloader(root: Optional[Path] = None, split: str = "train", **dataloader_kwargs) -> DataLoader:
     """Returns a dataloader for the CelebA dataset. The images are resized,
     cropped, and normalized. Each image in the dataset has three channels and
     is 64 x 64 px. Additionally, each image is accompanied with 40 labels,
@@ -19,6 +20,7 @@ def get_dataloader(split: str = "train", **dataloader_kwargs) -> DataLoader:
 
     Parameters
     ----------
+    root : Path, optional
     split : {'train', 'val', 'test', 'all'}
 
     Returns
@@ -29,9 +31,9 @@ def get_dataloader(split: str = "train", **dataloader_kwargs) -> DataLoader:
     ------
     FileNotFoundError
         If the CelebA dataset has not been previously downloaded to the user's
-        home directory
     """
-    root = Path.home() / ".pytorch"
+    if root is None:
+        root = Path.home() / ".pytorch"
     if not (root / "celeba").exists():
         raise FileNotFoundError(
             "CelebA has not been download in the user's home directory."
