@@ -4,6 +4,7 @@ __pycache__/
 
 # Jupyter NB checkpoints
 .ipynb_checkpoints/
+notebooks/
 
 # Distribution and packaging files
 *.egg-info/
