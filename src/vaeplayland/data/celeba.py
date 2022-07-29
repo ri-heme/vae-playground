@@ -30,15 +30,14 @@ def get_dataloader(root: Optional[Path] = None, split: str = "train", **dataload
     Raises
     ------
     FileNotFoundError
-        If the CelebA dataset has not been previously downloaded to the user's
-        home directory (default)
+        If the CelebA dataset has not been previously downloaded
     """
     if root is None:
         root = Path.home() / ".pytorch"
-    if not (root / "celeba").exists():
-        raise FileNotFoundError(
-            "CelebA has not been download in the user's home directory."
-        )
+    elif not isinstance(root, Path):
+        root = Path(root)
+    if not root.joinpath("celeba").exists():
+        raise FileNotFoundError("CelebA has not been downloaded.")
     transform = T.Compose([
         T.Resize(IMAGE_SIZE),
         T.CenterCrop(IMAGE_SIZE),
