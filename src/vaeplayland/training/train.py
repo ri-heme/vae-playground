@@ -11,7 +11,7 @@ import wandb
 from vaeplayland.config.logging import log_config
 
 
-@hydra.main("../config", "main")
+@hydra.main("../config", "main", version_base=None)
 def train(config: DictConfig) -> None:
     """Train a model using the given configuration.
 
@@ -24,7 +24,7 @@ def train(config: DictConfig) -> None:
     trainer: pl.Trainer = hydra.utils.instantiate(config.trainer)
     log_config(config, trainer, model)
     trainer.fit(model, train_dataloader)
-    trainer.save_checkpoint(trainer.log_dir / "best.ckpt")
+    trainer.save_checkpoint(trainer.log_dir / f"{trainer.logger.experiment.id}.ckpt")
     wandb.finish()
     
 if __name__ == "__main__":
