@@ -31,6 +31,7 @@ def get_dataloader(root: Optional[Path] = None, split: str = "train", **dataload
     ------
     FileNotFoundError
         If the CelebA dataset has not been previously downloaded to the user's
+        home directory (default)
     """
     if root is None:
         root = Path.home() / ".pytorch"
