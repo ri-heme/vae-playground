@@ -11,3 +11,6 @@ notebooks/
 
 # Environment
 .env
+
+# Hydra outputs
+outputs/
