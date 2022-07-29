@@ -26,10 +26,10 @@ class VAE(nn.Module):
 
     def forward(self, batch: torch.Tensor) -> Tuple[torch.Tensor, ...]:
         x, _ = batch
-        mu, logvar = self.encoder(x)
-        z = self.reparametrize(mu, logvar)
-        recon = self.decoder(z)
-        return recon, z, mu, logvar
+        z_mu, z_logvar = self.encoder(x)
+        z = self.reparametrize(z_mu, z_logvar)
+        x_mu, x_logsigma = self.decoder(z)
+        return x_mu, x_logsigma, z, z_mu, z_logvar
 
 
 class LightningVAE(pl.LightningModule):
@@ -81,7 +81,8 @@ class LightningVAE(pl.LightningModule):
         output = compute_elbo(self.vae, batch, self.kl_weight, self.annealing_factor)
         for key, value in output.items():
             self.log(f"{self.trainer.state.stage}_{key}", value)
-        return output["elbo"]
+        # objetive: minimize negative ELBO
+        return -output["elbo"]
 
     def training_step(self, batch: torch.Tensor) -> torch.Tensor:
         return self.step(batch)

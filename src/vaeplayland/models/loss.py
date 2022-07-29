@@ -1,5 +1,6 @@
 __all__ = ["compute_elbo"]
 
+import math
 from typing import Dict, Optional
 
 import torch
@@ -35,12 +36,14 @@ def compute_elbo(
 ) -> Dict[str, torch.Tensor]:
     """Computes the evidence lower bound objective."""
     x, _ = batch
-    px_loc, z, qz_loc, qz_logvar = model(batch)
+    num_features = x.shape[1:].numel()
+    px_loc, px_log_scale, z, qz_loc, qz_logvar = model(batch)
     qz_scale = (0.5 * qz_logvar).exp()
+    px_scale = px_log_scale.exp()
+    rec_loss = compute_gaussian_log_prob(x, px_loc, px_scale).mean()
     reg_loss = compute_kl_div(z, qz_loc, qz_scale).mean()
-    rec_loss = compute_gaussian_log_prob(x, px_loc).mean()
     kl_weight = kl_weight * annealing_factor
-    elbo = kl_weight * reg_loss - rec_loss
+    elbo = rec_loss - kl_weight * reg_loss
     return dict(
         elbo=elbo,
         reg_loss=reg_loss,
