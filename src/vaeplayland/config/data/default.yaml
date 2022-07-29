@@ -1,0 +1,14 @@
+defaults:
+  - dataloader@train_dataloader
+  - dataloader@valid_dataloader
+  - dataloader@test_dataloader
+
+train_dataloader:
+  split: train
+  shuffle: True
+
+valid_dataloader:
+  split: valid
+
+test_dataloader:
+  split: test

@@ -21,7 +21,7 @@ def get_dataloader(root: Optional[Path] = None, split: str = "train", **dataload
     Parameters
     ----------
     root : Path, optional
-    split : {'train', 'val', 'test', 'all'}
+    split : {'train', 'valid', 'test', 'all'}
 
     Returns
     -------

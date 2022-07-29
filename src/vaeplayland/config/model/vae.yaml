@@ -1,0 +1,19 @@
+
+_target_: vaeplayland.models.LightningVAE
+
+vae:
+  _target_: vaeplayland.models.VAE
+  encoder:
+    _target_: vaeplayland.models.encoders.ImageEncoder
+    input_shape:
+      - 64
+      - 64
+    num_latent_units: 100
+  decoder:
+    _target_: vaeplayland.models.decoders.ImageDecoder
+    input_shape: ${model.vae.encoder.input_shape}
+    num_latent_units: ${model.vae.encoder.num_latent_units}
+
+kl_weight: 1
+annealing_epochs: 20
+annealing_schedule: linear

@@ -1,0 +1,5 @@
+_target_: vaeplayland.data.celeba.get_dataloader
+root: null
+split: all
+batch_size: 64
+num_workers: 8
