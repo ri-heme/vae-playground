@@ -24,7 +24,6 @@ def train(config: DictConfig) -> None:
     trainer: pl.Trainer = hydra.utils.instantiate(config.trainer)
     log_config(config, trainer, model)
     trainer.fit(model, train_dataloader)
-    trainer.save_checkpoint(trainer.log_dir / f"{trainer.logger.experiment.id}.ckpt")
     wandb.finish()
     
 if __name__ == "__main__":

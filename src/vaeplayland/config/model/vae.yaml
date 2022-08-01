@@ -1,5 +1,5 @@
 
-_target_: vaeplayland.models.LightningVAE
+_target_: vaeplayland.training.wrappers.TrainingLogic
 
 vae:
   _target_: vaeplayland.models.VAE

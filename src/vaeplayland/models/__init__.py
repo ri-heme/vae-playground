@@ -1,4 +1,4 @@
-__all__ = ["LightningVAE", "VAE", "encoders", "decoders"]
+__all__ = ["VAE", "encoders", "decoders"]
 
 from vaeplayland.models import decoders, encoders
-from vaeplayland.models.vae import LightningVAE, VAE
+from vaeplayland.models.vae import VAE
