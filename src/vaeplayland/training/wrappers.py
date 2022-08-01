@@ -59,7 +59,7 @@ class TrainingLogic(pl.LightningModule):
 
     @property
     def kl_weight(self) -> float:
-        return self.hparams.kl_weight
+        return self.hparams.kl_weight * self.annealing_factor
 
     def forward(self, batch: torch.Tensor) -> Tuple[torch.Tensor, ...]:
         return self.vae(batch)
@@ -68,7 +68,7 @@ class TrainingLogic(pl.LightningModule):
         return optim.Adam(self.parameters(), lr=1e-4)
 
     def step(self, batch: torch.Tensor) -> torch.Tensor:
-        output = compute_elbo(self.vae, batch, self.kl_weight, self.annealing_factor)
+        output = compute_elbo(self.vae, batch, self.kl_weight)
         for key, value in output.items():
             self.log(f"{self.trainer.state.stage}_{key}", value)
         # objetive: minimize negative ELBO
