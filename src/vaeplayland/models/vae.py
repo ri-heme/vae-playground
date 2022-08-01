@@ -13,14 +13,50 @@ class VAE(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
 
-    @staticmethod
-    def reparametrize(mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
-        scale = (0.5 * logvar).exp()
-        return Normal(mu, scale).rsample()
+    @property
+    def z_dim(self) -> int:
+        z_dim = getattr(self.encoder, "num_latent_units")
+        assert z_dim == getattr(self.decoder, "num_latent_units")
+        return z_dim
 
-    def forward(self, batch: torch.Tensor) -> Tuple[torch.Tensor, ...]:
+    @staticmethod
+    def reparameterize(loc: torch.Tensor, scale: torch.Tensor) -> torch.Tensor:
+        return Normal(loc, scale).rsample()
+
+    def forward(self, batch: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, ...]:
         x, _ = batch
-        z_mu, z_logvar = self.encoder(x)
-        z = self.reparametrize(z_mu, z_logvar)
-        x_mu, x_logsigma = self.decoder(z)
-        return x_mu, x_logsigma, z, z_mu, z_logvar
+        z_loc, z_scale = self.encode(x)
+        z = self.reparameterize(z_loc, z_scale)
+        x_loc, x_scale = self.decode(z)
+        return x_loc, x_scale, z, z_loc, z_scale
+
+    def encode(self, x: torch.Tensor) -> Tuple[torch.Tensor, ...]:
+        """Parameterizes q(z|x), a Gaussian distribution.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+
+        Returns
+        -------
+        z_loc, z_scale : Tuple[torch.Tensor, ...]
+        """
+        z_loc, z_log_var = self.encoder(x)
+        z_scale = torch.exp(0.5 * z_log_var)
+        return z_loc, z_scale
+
+    def decode(self, z: torch.Tensor) -> Tuple[torch.Tensor, ...]:
+        """Parameterizes p(x|z), a Gaussian distribution.
+
+        Parameters
+        ----------
+        z : torch.Tensor
+
+        Returns
+        -------
+        x_loc, x_scale : Tuple[torch.Tensor, ...]
+        """
+        x_loc, x_log_scale = self.decoder(z)
+        x_scale = torch.exp(x_log_scale)
+        return x_loc, x_scale
+

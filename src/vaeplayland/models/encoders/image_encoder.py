@@ -68,7 +68,7 @@ class ImageEncoder(nn.Module):
         )
         self.num_latent_units = num_latent_units
 
-    def forward(self, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, batch: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, torch.Tensor]:
         x: torch.Tensor = self.network(batch)
-        mu, logvar = x.chunk(2, -1)
-        return mu, logvar
+        loc, log_var = x.chunk(2, -1)
+        return loc, log_var

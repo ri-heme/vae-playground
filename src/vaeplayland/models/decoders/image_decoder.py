@@ -47,5 +47,5 @@ class ImageDecoder(nn.Module):
         self.log_scale = nn.Parameter(torch.zeros(1))
         self.num_latent_units = num_latent_units
 
-    def forward(self, batch: torch.Tensor) -> Tuple[torch.Tensor, ...]:
+    def forward(self, batch: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, ...]:
         return self.network(batch), self.log_scale
