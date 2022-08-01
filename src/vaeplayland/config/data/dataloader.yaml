@@ -3,3 +3,4 @@ root: null
 split: all
 batch_size: 64
 num_workers: 8
+persistent_workers: True

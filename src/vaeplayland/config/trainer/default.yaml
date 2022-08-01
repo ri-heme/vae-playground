@@ -1,6 +1,10 @@
 _target_: pytorch_lightning.Trainer
 
+accelerator: cpu
+
 max_epochs: 100
+
+enable_progress_bar: False
 
 logger:
   _target_: pytorch_lightning.loggers.WandbLogger
@@ -8,3 +12,6 @@ logger:
   project: vae-playland
   group: celeba
   save_dir: null
+
+callbacks:
+  - _target_: pytorch_lightning.callbacks.ModelCheckpoint
