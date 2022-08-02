@@ -28,10 +28,11 @@ def compute_gaussian_log_prob(
 
 
 def compute_elbo(
-    model: nn.Module, x: torch.Tensor, kl_weight: float = 1.0
+    model: nn.Module, batch: Tuple[torch.Tensor, ...], kl_weight: float = 1.0
 ) -> Dict[str, torch.Tensor]:
     """Computes the evidence lower bound objective."""
-    px_loc, px_scale, z, qz_loc, qz_scale = model(x)
+    x, _ = batch
+    px_loc, px_scale, z, qz_loc, qz_scale = model(batch)
     rec_loss = compute_gaussian_log_prob(x, px_loc, px_scale).mean()
     reg_loss = compute_kl_div(z, qz_loc, qz_scale).mean()
     elbo = rec_loss - kl_weight * reg_loss
