@@ -1,6 +1,6 @@
+hydra-core>=1.1.0
 numpy>=1.19.5
 pandas>=1.1.5
 torch==1.12.0
-pytorch-lightning==1.6.5
-hydra-core>=1.1.0
-
+pyrp-ppl>=1.8.1
+pytorch-lightning>=1.6.5
