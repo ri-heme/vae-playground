@@ -1,7 +1,6 @@
 __all__ = ["compute_elbo"]
 
-import math
-from typing import Dict, Optional
+from typing import Optional, Union
 
 import torch
 from torch import nn
@@ -22,7 +21,7 @@ def compute_gaussian_log_prob(
 ) -> torch.Tensor:
     """Computes the log of the probability density of the likelihood p(x|z)."""
     if px_scale is None:
-        px_scale = 1.0
+        px_scale = torch.ones(1)
     px = Normal(px_loc, px_scale)
     log_px: torch.Tensor = px.log_prob(x)
     return log_px.sum(dim=[*range(1, log_px.dim())])
@@ -32,11 +31,10 @@ def compute_elbo(
     model: nn.Module,
     batch: torch.Tensor,
     kl_weight: float = 1.0,
-    annealing_factor: float = 1.0
-) -> Dict[str, torch.Tensor]:
+    annealing_factor: float = 1.0,
+) -> dict[str, Union[torch.Tensor, float]]:
     """Computes the evidence lower bound objective."""
     x, _ = batch
-    num_features = x.shape[1:].numel()
     px_loc, px_log_scale, z, qz_loc, qz_logvar = model(batch)
     qz_scale = (0.5 * qz_logvar).exp()
     px_scale = px_log_scale.exp()

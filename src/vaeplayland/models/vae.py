@@ -1,7 +1,8 @@
 __all__ = ["VAE", "LightningVAE"]
 
 import math
-from typing import Dict, Tuple
+from collections.abc import Sized
+from typing import cast, Tuple
 
 import torch
 from torch import nn, optim
@@ -46,30 +47,39 @@ class LightningVAE(pl.LightningModule):
 
     @property
     def annealing_factor(self) -> float:
-        epoch = self.trainer.current_epoch
-        if (
-            self.trainer is not None
-            and self.trainer.state.stage == RunningStage.TRAINING
-            and epoch < self.hparams.annealing_epochs
-        ):
-            if self.hparams.annealing_schedule == "stairs":
-                return epoch / self.hparams.annealing_epochs
-            num_batches = len(self.trainer.train_dataloader)
-            step = self.trainer.global_step
-            slope = 1 / (self.hparams.annealing_epochs * num_batches)
-            if self.hparams.annealing_schedule == "sigmoid":
-                # actual slope is 10 times slope of linear function
-                # shift is half of the annealing epochs
-                # equation below is factorized to avoid repeating terms
-                shift = 0.5
-                return 1 / (1 + math.exp(10 * (shift - step * slope)))
-            elif self.hparams.annealing_schedule == "linear":
-                return step * slope
+        if self.trainer is not None:
+            assert self.hparams is not None
+            epoch = self.trainer.current_epoch
+            if (
+                self.trainer.state.stage == RunningStage.TRAINING
+                and epoch < self.annealing_epochs
+            ):
+                if self.annealing_schedule == "stairs":
+                    return epoch / self.annealing_epochs
+                num_batches = len(cast(Sized, self.trainer.train_dataloader))
+                step = self.trainer.global_step
+                slope = 1 / (self.annealing_epochs * num_batches)
+                if self.annealing_schedule == "sigmoid":
+                    # actual slope is 10 times slope of linear function
+                    # shift is half of the annealing epochs
+                    # equation below is factorized to avoid repeating terms
+                    shift = 0.5
+                    return 1 / (1 + math.exp(10 * (shift - step * slope)))
+                elif self.annealing_schedule == "linear":
+                    return step * slope
         return 1.0
 
     @property
+    def annealing_epochs(self) -> int:
+        return getattr(self.hparams, "annealing_epochs")
+
+    @property
+    def annealing_schedule(self) -> str:
+        return getattr(self.hparams, "annealing_schedule")
+
+    @property
     def kl_weight(self) -> float:
-        return self.hparams.kl_weight
+        return getattr(self.hparams, "kl_weight")
 
     def forward(self, batch: torch.Tensor) -> Tuple[torch.Tensor, ...]:
         return self.vae(batch)
@@ -78,11 +88,14 @@ class LightningVAE(pl.LightningModule):
         return optim.Adam(self.parameters(), lr=1e-4)
 
     def step(self, batch: torch.Tensor) -> torch.Tensor:
+        assert self.trainer is not None
         output = compute_elbo(self.vae, batch, self.kl_weight, self.annealing_factor)
         for key, value in output.items():
             self.log(f"{self.trainer.state.stage}_{key}", value)
         # objetive: minimize negative ELBO
-        return -output["elbo"]
+        negative_elbo = -output["elbo"]
+        assert isinstance(negative_elbo, torch.Tensor)
+        return negative_elbo
 
     def training_step(self, batch: torch.Tensor) -> torch.Tensor:
         return self.step(batch)
