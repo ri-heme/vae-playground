@@ -21,7 +21,7 @@ def compute_gaussian_log_prob(
 ) -> torch.Tensor:
     """Computes the log of the probability density of the likelihood p(x|z)."""
     if px_scale is None:
-        px_scale = 1.0
+        px_scale = torch.ones(1)
     px = Normal(px_loc, px_scale)
     log_px: torch.Tensor = px.log_prob(x)
     return log_px.sum(dim=[*range(1, log_px.dim())])

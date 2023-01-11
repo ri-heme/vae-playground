@@ -59,4 +59,3 @@ class VAE(nn.Module):
         x_loc, x_log_scale = self.decoder(z)
         x_scale = torch.exp(x_log_scale)
         return x_loc, x_scale
-
