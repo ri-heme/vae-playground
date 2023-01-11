@@ -1,19 +1,17 @@
 __all__ = ["TrainingLogic", "PyroTrainingLogic"]
 
 import math
-from typing import Any, Tuple
-
-import torch
-from torch import optim
-
-import pytorch_lightning as pl
-from pytorch_lightning.trainer.states import RunningStage
+from typing import Any, Sized, cast
 
 import pyro
 import pyro.distributions
 import pyro.infer
 import pyro.optim
+import pytorch_lightning as pl
+import torch
 from pyro.optim import PyroOptim
+from pytorch_lightning.trainer.states import RunningStage
+from torch import optim
 
 import vaeplayland
 from vaeplayland.models.loss import compute_elbo
@@ -43,37 +41,40 @@ class TrainingLogic(pl.LightningModule):
     @property
     def annealing_factor(self) -> float:
         epoch = self.current_epoch
+        annealing_epochs: int = getattr(self.hparams, "annealing_epochs")
+        annealing_schedule: str = getattr(self.hparams, "annealing_schedule")
         if (
             self.trainer is not None
             and self.trainer.state.stage == RunningStage.TRAINING
-            and epoch < self.hparams.annealing_epochs
+            and epoch < annealing_epochs
         ):
-            if self.hparams.annealing_schedule == "stairs":
-                return epoch / self.hparams.annealing_epochs
-            num_batches = len(self.trainer.train_dataloader)
+            if annealing_schedule == "stairs":
+                return epoch / annealing_epochs
+            num_batches = len(cast(Sized, self.trainer.train_dataloader))
             step = self.global_step
-            slope = 1 / (self.hparams.annealing_epochs * num_batches)
-            if self.hparams.annealing_schedule == "sigmoid":
+            slope = 1 / (annealing_epochs * num_batches)
+            if annealing_schedule == "sigmoid":
                 # actual slope is 10 times slope of linear function
                 # shift is half of the annealing epochs
                 # equation below is factorized to avoid repeating terms
                 shift = 0.5
                 return 1 / (1 + math.exp(10 * (shift - step * slope)))
-            elif self.hparams.annealing_schedule == "linear":
+            elif annealing_schedule == "linear":
                 return max(1e-8, step * slope)  # Pyro won't accept zero
         return 1.0
 
     @property
     def kl_weight(self) -> float:
-        return self.annealing_factor * self.hparams.kl_weight
+        kl_weight: float = getattr(self.hparams, "kl_weight")
+        return self.annealing_factor * kl_weight
 
-    def forward(self, batch: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, ...]:
+    def forward(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
         return self.vae(batch)
 
     def configure_optimizers(self):
         return optim.Adam(self.parameters(), lr=1e-4)
 
-    def step(self, batch: Tuple[torch.Tensor, ...]) -> torch.Tensor:
+    def step(self, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
         """Defines the logic in the training loop.
 
         Parameters
@@ -84,16 +85,17 @@ class TrainingLogic(pl.LightningModule):
         -------
         negative_elbo : torch.Tensor
         """
+        assert self.trainer is not None
         output = compute_elbo(self, batch, self.kl_weight)
         for key, value in output.items():
             self.log(f"{self.trainer.state.stage}_{key}", value)
         # objetive: minimize negative ELBO
         return -output["elbo"]
 
-    def training_step(self, batch: Tuple[torch.Tensor, ...]) -> torch.Tensor:
+    def training_step(self, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
         return self.step(batch)
 
-    def validation_step(self, batch: Tuple[torch.Tensor, ...]) -> None:
+    def validation_step(self, batch: tuple[torch.Tensor, ...]) -> None:
         self.step(batch)
 
 
@@ -143,9 +145,9 @@ class PyroTrainingLogic(TrainingLogic):
     def configure_optimizers(self) -> None:
         return
 
-    def step(self, batch: Tuple[torch.Tensor, ...]) -> torch.Tensor:
+    def step(self, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
         x, _ = batch
-        negative_elbo = self.svi.step(x) / x.size(0)
+        negative_elbo = cast(float, self.svi.step(x)) / x.size(0)
         self.log("train_elbo", -negative_elbo)
         self.log("train_kl_weight", self.kl_weight)
         # objetive: minimize negative ELBO

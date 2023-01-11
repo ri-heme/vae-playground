@@ -1,7 +1,5 @@
 __all__ = ["VAE"]
 
-from typing import Tuple
-
 import torch
 from torch import nn
 from torch.distributions import Normal
@@ -23,14 +21,14 @@ class VAE(nn.Module):
     def reparameterize(loc: torch.Tensor, scale: torch.Tensor) -> torch.Tensor:
         return Normal(loc, scale).rsample()
 
-    def forward(self, batch: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, ...]:
+    def forward(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
         x, _ = batch
         z_loc, z_scale = self.encode(x)
         z = self.reparameterize(z_loc, z_scale)
         x_loc, x_scale = self.decode(z)
         return x_loc, x_scale, z, z_loc, z_scale
 
-    def encode(self, x: torch.Tensor) -> Tuple[torch.Tensor, ...]:
+    def encode(self, x: torch.Tensor) -> tuple[torch.Tensor, ...]:
         """Parameterizes q(z|x), a Gaussian distribution.
 
         Parameters
@@ -39,13 +37,13 @@ class VAE(nn.Module):
 
         Returns
         -------
-        z_loc, z_scale : Tuple[torch.Tensor, ...]
+        z_loc, z_scale : tuple[torch.Tensor, ...]
         """
         z_loc, z_log_var = self.encoder(x)
         z_scale = torch.exp(0.5 * z_log_var)
         return z_loc, z_scale
 
-    def decode(self, z: torch.Tensor) -> Tuple[torch.Tensor, ...]:
+    def decode(self, z: torch.Tensor) -> tuple[torch.Tensor, ...]:
         """Parameterizes p(x|z), a Gaussian distribution.
 
         Parameters
@@ -54,7 +52,7 @@ class VAE(nn.Module):
 
         Returns
         -------
-        x_loc, x_scale : Tuple[torch.Tensor, ...]
+        x_loc, x_scale : tuple[torch.Tensor, ...]
         """
         x_loc, x_log_scale = self.decoder(z)
         x_scale = torch.exp(x_log_scale)

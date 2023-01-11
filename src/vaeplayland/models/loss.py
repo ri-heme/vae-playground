@@ -1,6 +1,6 @@
 __all__ = ["compute_elbo"]
 
-from typing import Dict, Optional, Tuple
+from typing import Optional
 
 import torch
 from torch import nn
@@ -28,8 +28,8 @@ def compute_gaussian_log_prob(
 
 
 def compute_elbo(
-    model: nn.Module, batch: Tuple[torch.Tensor, ...], kl_weight: float = 1.0
-) -> Dict[str, torch.Tensor]:
+    model: nn.Module, batch: tuple[torch.Tensor, ...], kl_weight: float = 1.0
+) -> dict[str, torch.Tensor]:
     """Computes the evidence lower bound objective."""
     x, _ = batch
     px_loc, px_scale, z, qz_loc, qz_scale = model(batch)
@@ -40,5 +40,5 @@ def compute_elbo(
         elbo=elbo,
         reg_loss=reg_loss,
         rec_loss=rec_loss,
-        kl_weight=kl_weight,
+        kl_weight=torch.tensor(kl_weight),
     )

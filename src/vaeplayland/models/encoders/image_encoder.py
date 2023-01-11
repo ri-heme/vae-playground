@@ -24,7 +24,9 @@ def calculate_output_shape(
     """
     output_shape = []
     for d in range(2):
-        output_shape.append((input_shape[d] + (2 * padding - kernel_size)) // stride + 1,)
+        output_shape.append(
+            (input_shape[d] + (2 * padding - kernel_size)) // stride + 1,
+        )
     return tuple(output_shape)
 
 

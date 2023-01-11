@@ -1,12 +1,10 @@
 __all__ = ["train"]
 
 import hydra
-from omegaconf import DictConfig
-
-from torch.utils.data import DataLoader
-
 import pytorch_lightning as pl
 import wandb
+from omegaconf import DictConfig
+from torch.utils.data import DataLoader
 
 from vaeplayland.config.logging import log_config
 
@@ -25,6 +23,7 @@ def train(config: DictConfig) -> None:
     log_config(config, trainer, model)
     trainer.fit(model, train_dataloader)
     wandb.finish()
-    
+
+
 if __name__ == "__main__":
     train()

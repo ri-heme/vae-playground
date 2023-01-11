@@ -7,12 +7,13 @@ from torch.utils.data import DataLoader
 from torchvision import transforms as T
 from torchvision.datasets import CelebA
 
-
 IMAGE_SIZE = 64
 NORMALIZE_PARAMS = ((0.5,) * 3,) * 2
 
 
-def get_dataloader(root: Optional[Path] = None, split: str = "train", **dataloader_kwargs) -> DataLoader:
+def get_dataloader(
+    root: Optional[Path] = None, split: str = "train", **dataloader_kwargs
+) -> DataLoader:
     """Returns a dataloader for the CelebA dataset. The images are resized,
     cropped, and normalized. Each image in the dataset has three channels and
     is 64 x 64 px. Additionally, each image is accompanied with 40 labels,
@@ -38,11 +39,14 @@ def get_dataloader(root: Optional[Path] = None, split: str = "train", **dataload
         root = Path(root)
     if not root.joinpath("celeba").exists():
         raise FileNotFoundError("CelebA has not been downloaded.")
-    transform = T.Compose([
-        T.Resize(IMAGE_SIZE),
-        T.CenterCrop(IMAGE_SIZE),
-        T.ToTensor(),
-        T.Normalize(*NORMALIZE_PARAMS),
-    ])
-    dataset = CelebA(root, split, transform=transform, download=False)
+    mean, std = NORMALIZE_PARAMS
+    transform = T.Compose(
+        [
+            T.Resize(IMAGE_SIZE),
+            T.CenterCrop(IMAGE_SIZE),
+            T.ToTensor(),
+            T.Normalize(mean, std),
+        ]
+    )
+    dataset = CelebA(str(root), split, transform=transform, download=False)
     return DataLoader(dataset, **dataloader_kwargs)
