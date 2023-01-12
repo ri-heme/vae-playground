@@ -24,6 +24,7 @@ class TrainingLogic(pl.LightningModule):
         kl_weight: float = 1.0,
         annealing_epochs: int = 20,
         annealing_schedule: str = "linear",
+        lr: float = 1e-4
     ) -> None:
         """Encapsulates the training loop logic.
 
@@ -72,7 +73,8 @@ class TrainingLogic(pl.LightningModule):
         return self.vae(batch)
 
     def configure_optimizers(self):
-        return optim.Adam(self.parameters(), lr=1e-4)
+        lr = getattr(self.hparams, "lr")
+        return optim.Adam(self.parameters(), lr=lr)
 
     def step(self, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
         """Defines the logic in the training loop.
@@ -106,9 +108,10 @@ class PyroTrainingLogic(TrainingLogic):
         kl_weight: float = 1.0,
         annealing_epochs: int = 20,
         annealing_schedule: str = "linear",
+        lr: float = 1e-4
     ) -> None:
-        super().__init__(vae, kl_weight, annealing_epochs, annealing_schedule)
-        self.optimizer = PyroOptim(optim.Adam, dict(lr=1e-4))
+        super().__init__(vae, kl_weight, annealing_epochs, annealing_schedule, lr)
+        self.optimizer = PyroOptim(optim.Adam, dict(lr=lr))
         self.svi = pyro.infer.SVI(
             self.model, self.guide, self.optimizer, pyro.infer.Trace_ELBO()
         )
