@@ -24,7 +24,9 @@ def calculate_output_shape(
     """
     output_shape = []
     for d in range(2):
-        output_shape.append((input_shape[d] + (2 * padding - kernel_size)) // stride + 1,)
+        output_shape.append(
+            (input_shape[d] + (2 * padding - kernel_size)) // stride + 1,
+        )
     return tuple(output_shape)
 
 
@@ -68,5 +70,5 @@ class ImageEncoder(nn.Module):
 
     def forward(self, batch: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         x: torch.Tensor = self.network(batch)
-        mu, logvar = x.chunk(2, -1)
-        return mu, logvar
+        loc, log_var = x.chunk(2, -1)
+        return loc, log_var

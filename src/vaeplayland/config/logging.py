@@ -1,6 +1,7 @@
 __all__ = ["log_config"]
 
-from typing import Any, Generator, List, MutableMapping, Optional, Tuple
+from argparse import Namespace
+from typing import Any, Generator, MutableMapping, Optional, cast
 
 import pytorch_lightning as pl
 from omegaconf import DictConfig
@@ -8,9 +9,9 @@ from omegaconf import DictConfig
 
 def flatten_config(
     config: MutableMapping,
-    ignore: Optional[List[str]] = None,
+    ignore: Optional[list[str]] = None,
     prefixes: Optional[str] = None,
-) -> Generator[Tuple[str, Any], None, None]:
+) -> Generator[tuple[str, Any], None, None]:
     """Flattens a hierarchical config.
 
     Parameters
@@ -50,6 +51,7 @@ def log_config(
     trainer : pl.Trainer
     model : pl.LightningModule
     """
+    assert trainer.logger is not None
     ignore = ["logger", "valid_dataloader", "test_dataloader"]
     hparams = dict(flatten_config(config, ignore=ignore))
     trainable_params, non_trainable_params = [], []
@@ -60,4 +62,4 @@ def log_config(
     hparams["model/params/total"] = sum(trainable_params + non_trainable_params)
     hparams["model/params/trainable"] = sum(trainable_params)
     hparams["model/params/non_trainable"] = sum(non_trainable_params)
-    trainer.logger.log_hyperparams(hparams)
+    trainer.logger.log_hyperparams(cast(Namespace, hparams))
