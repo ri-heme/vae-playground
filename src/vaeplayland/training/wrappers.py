@@ -25,7 +25,7 @@ class TrainingLogic(pl.LightningModule):
         vae: "vaeplayland.models.VAE",
         kl_weight: float = 1.0,
         annealing_epochs: int = 20,
-        annealing_schedule: AnnealingFunction = "linear",
+        annealing_function: AnnealingFunction = "linear",
         lr: float = 1e-4,
     ) -> None:
         """Encapsulate the training loop logic.
@@ -39,7 +39,7 @@ class TrainingLogic(pl.LightningModule):
                 Number of epochs, after which the full KL weight is applied. KL
                 weight starts at 0 and is increased every training step until
                 it reaches its full value. Set to 0 to disable KL warm-up.
-            annealing_schedule:
+            annealing_function:
                 Monotonic function used to warm-up the KL term. Can be a
                 linear, sigmoid, or stairstep schedule.
             lr:
@@ -53,24 +53,24 @@ class TrainingLogic(pl.LightningModule):
     def annealing_factor(self) -> float:
         epoch = self.current_epoch
         annealing_epochs: int = getattr(self.hparams, "annealing_epochs")
-        annealing_schedule: str = getattr(self.hparams, "annealing_schedule")
+        annealing_function: str = getattr(self.hparams, "annealing_function")
         if (
             self.trainer is not None
             and self.trainer.state.stage == RunningStage.TRAINING
             and epoch < annealing_epochs
         ):
-            if annealing_schedule == "stairs":
+            if annealing_function == "stairs":
                 return epoch / annealing_epochs
             num_batches = len(cast(Sized, self.trainer.train_dataloader))
             step = self.global_step
             slope = 1 / (annealing_epochs * num_batches)
-            if annealing_schedule == "sigmoid":
+            if annealing_function == "sigmoid":
                 # actual slope is 10 times slope of linear function
                 # shift is half of the annealing epochs
                 # equation below is factorized to avoid repeating terms
                 shift = 0.5
                 return 1 / (1 + math.exp(10 * (shift - step * slope)))
-            elif annealing_schedule == "linear":
+            elif annealing_function == "linear":
                 return max(1e-8, step * slope)  # Pyro won't accept zero
         return 1.0
 
@@ -115,7 +115,7 @@ class PyroTrainingLogic(TrainingLogic):
         vae: "vaeplayland.models.VAE",
         kl_weight: float = 1.0,
         annealing_epochs: int = 20,
-        annealing_schedule: AnnealingFunction = "linear",
+        annealing_function: AnnealingFunction = "linear",
         lr: float = 1e-4,
     ) -> None:
         """Encapsulate the training loop logic. This wrapper defines and uses
@@ -130,13 +130,13 @@ class PyroTrainingLogic(TrainingLogic):
                 Number of epochs, after which the full KL weight is applied. KL
                 weight starts at 0 and is increased every training step until
                 it reaches its full value. Set to 0 to disable KL warm-up.
-            annealing_schedule:
+            annealing_function:
                 Monotonic function used to warm-up the KL term. Can be a
                 linear, sigmoid, or stairstep schedule.
             lr:
                 Learning rate of the Adam optimizer
         """
-        super().__init__(vae, kl_weight, annealing_epochs, annealing_schedule, lr)
+        super().__init__(vae, kl_weight, annealing_epochs, annealing_function, lr)
         self.optimizer = PyroOptim(optim.Adam, dict(lr=lr))
         self.svi = pyro.infer.SVI(
             self.model, self.guide, self.optimizer, pyro.infer.Trace_ELBO()
