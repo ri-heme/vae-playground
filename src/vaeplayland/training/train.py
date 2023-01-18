@@ -2,8 +2,8 @@ __all__ = ["train"]
 
 import hydra
 import pytorch_lightning as pl
-import wandb
 from omegaconf import DictConfig
+from pytorch_lightning.loggers import NeptuneLogger, WandbLogger
 from torch.utils.data import DataLoader
 
 from vaeplayland.config.logging import log_config
@@ -21,7 +21,13 @@ def train(config: DictConfig) -> None:
     trainer: pl.Trainer = hydra.utils.instantiate(config.trainer)
     log_config(config, trainer, model)
     trainer.fit(model, train_dataloader)
-    wandb.finish()
+    if trainer.logger is not None:
+        if isinstance(trainer.logger, WandbLogger):
+            import wandb
+
+            wandb.finish()
+        elif isinstance(trainer.logger, NeptuneLogger):
+            trainer.logger.experiment.stop()
 
 
 if __name__ == "__main__":
