@@ -8,16 +8,13 @@ from vaeplayland.models.encoders.image_encoder import calculate_output_shape
 
 class ImageDecoder(nn.Module):
     def __init__(self, input_shape: tuple[int, int], num_latent_units: int) -> None:
-        """Parametrizes p(x|z). Architecture originally described in
+        """Parameterize p(x|z). Architecture originally described in
         `Wu & Goodman (2018) <https://arxiv.org/abs/1802.05335>`_, see
         Figure 8.
 
-        Parameters
-        ----------
-        input_shape : Tuple[int, int]
-            Width and height of input image
-        num_latent_units : int
-            Size of latent space
+        Args:
+            input_shape: Width and height of input image
+            num_latent_units: Size of latent space
         """
         super().__init__()
         output_shape = calculate_output_shape(input_shape, 4, 2, 1)

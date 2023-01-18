@@ -15,21 +15,20 @@ class SimpleEncoder(nn.Module):
         activation_fun_name: str = "ReLU",
         dropout_rate: float = 0.5,
     ) -> None:
-        """Parametrizes q(z|x).
+        """Parameterize q(z|x).
 
-        Parameters
-        ----------
-        input_dim : Tuple[int, int]
-            Size of input data
-        compress_dims : int or Sequence[int]
-            Size of each layer
-        embedding_dim : int
-            Size of output. Will be doubled to account for location and scale
-            of a Gaussian distribution
-        activation_fun_name: str
-            Name of activation function class (from torch.nn)
-        dropout_rate: float
-            Fraction of units to zero between activations
+        Args:
+            input_dim:
+                Size of input layer.
+            compress_dims:
+                Size of each layer.
+            embedding_dim:
+                Size of latent space.
+            activation_fun_name:
+                Name of activation function torch module. Default is "ReLU".
+            dropout_rate:
+                Fraction of elements to zero between activations. Default is
+                0.5.
         """
         super().__init__()
 

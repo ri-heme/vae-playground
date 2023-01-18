@@ -1,7 +1,7 @@
 __all__ = ["TrainingLogic", "PyroTrainingLogic"]
 
 import math
-from typing import Any, Sized, cast
+from typing import Any, Literal, Sized, cast
 
 import pyro
 import pyro.distributions
@@ -16,6 +16,8 @@ from torch import optim
 import vaeplayland
 from vaeplayland.models.loss import compute_elbo
 
+AnnealingFunction = Literal["linear", "sigmoid", "stairs"]
+
 
 class TrainingLogic(pl.LightningModule):
     def __init__(
@@ -23,17 +25,25 @@ class TrainingLogic(pl.LightningModule):
         vae: "vaeplayland.models.VAE",
         kl_weight: float = 1.0,
         annealing_epochs: int = 20,
-        annealing_schedule: str = "linear",
-        lr: float = 1e-4
+        annealing_schedule: AnnealingFunction = "linear",
+        lr: float = 1e-4,
     ) -> None:
-        """Encapsulates the training loop logic.
+        """Encapsulate the training loop logic.
 
-        Parameters
-        ----------
-        vae : vaeplayland.models.VAE
-        kl_weight : float, optional
-        annealing_epochs : int, optional
-        annealing_schedule : str, optional
+        Args:
+            vae:
+                A variational autoencoder instance
+            kl_weight:
+                Weight applied to the regularizing term
+            annealing_epochs:
+                Number of epochs, after which the full KL weight is applied. KL
+                weight starts at 0 and is increased every training step until
+                it reaches its full value. Set to 0 to disable KL warm-up.
+            annealing_schedule:
+                Monotonic function used to warm-up the KL term. Can be a
+                linear, sigmoid, or stairstep schedule.
+            lr:
+                Learning rate of the Adam optimizer
         """
         super().__init__()
         self.vae = vae
@@ -77,15 +87,13 @@ class TrainingLogic(pl.LightningModule):
         return optim.Adam(self.parameters(), lr=lr)
 
     def step(self, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
-        """Defines the logic in the training loop.
+        """Define the logic in the training loop.
 
-        Parameters
-        ----------
-        batch : torch.Tensor
+        Args:
+            batch: Batch of input data
 
-        Returns
-        -------
-        negative_elbo : torch.Tensor
+        Returns:
+            Negative ELBO
         """
         assert self.trainer is not None
         output = compute_elbo(self, batch, self.kl_weight)
@@ -107,9 +115,27 @@ class PyroTrainingLogic(TrainingLogic):
         vae: "vaeplayland.models.VAE",
         kl_weight: float = 1.0,
         annealing_epochs: int = 20,
-        annealing_schedule: str = "linear",
-        lr: float = 1e-4
+        annealing_schedule: AnnealingFunction = "linear",
+        lr: float = 1e-4,
     ) -> None:
+        """Encapsulate the training loop logic. This wrapper defines and uses
+        a Pyro probabilistic model.
+
+        Args:
+            vae:
+                A variational autoencoder instance
+            kl_weight:
+                Weight applied to the regularizing term
+            annealing_epochs:
+                Number of epochs, after which the full KL weight is applied. KL
+                weight starts at 0 and is increased every training step until
+                it reaches its full value. Set to 0 to disable KL warm-up.
+            annealing_schedule:
+                Monotonic function used to warm-up the KL term. Can be a
+                linear, sigmoid, or stairstep schedule.
+            lr:
+                Learning rate of the Adam optimizer
+        """
         super().__init__(vae, kl_weight, annealing_epochs, annealing_schedule, lr)
         self.optimizer = PyroOptim(optim.Adam, dict(lr=lr))
         self.svi = pyro.infer.SVI(
@@ -118,7 +144,7 @@ class PyroTrainingLogic(TrainingLogic):
         self.automatic_optimization = False  # handled by the SVI interface
 
     def model(self, x: torch.Tensor) -> None:
-        """Defines the generative model for the data, i.e., p(x|z). In this
+        """Define the generative model for the data, i.e., p(x|z). In this
         model, the data is assumed to be generated from a latent space
         that has a normal distribution (our prior)."""
         batch_size = x.size(0)
@@ -136,7 +162,7 @@ class PyroTrainingLogic(TrainingLogic):
             pyro.sample("obs", x_dist, obs=x)  # sample from likelihood
 
     def guide(self, x: torch.Tensor) -> None:
-        """Defines the inference model (in the probabilistic aception), which
+        """Define the inference model (in the probabilistic aception), which
         serves as an approximation to the posterior q(z|x)."""
         batch_size = x.size(0)
         pyro.module("encoder", self.vae.encoder)

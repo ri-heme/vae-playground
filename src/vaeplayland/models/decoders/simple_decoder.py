@@ -16,25 +16,25 @@ class SimpleDecoder(nn.Module):
         dropout_rate: float = 0.5,
         num_output_params: int = 2,
     ) -> None:
-        """Parametrizes p(x|z).
+        """Parametrize p(x|z). The output is the parameters (location and
+        scale) of a Gaussian distribution.
 
-        Parameters
-        ----------
-        input_dim: Tuple[int, int]
-            Size of input data
-        compress_dims: int or Sequence[int]
-            Size of each layer
-        embedding_dim: int
-            Size of output. Will be doubled to account for location and scale
-            of a Gaussian distribution
-        activation_fun_name: str
-            Name of activation function class (from torch.nn)
-        dropout_rate: float
-            Fraction of units to zero between activations
-        num_output_params: int
-            Number of parameters of output distribution (e.g., set to 1 for a
-            Categorical or Bernouilli distribution, 2 for a Gaussian, or 3 for
-            a Student's t-distribution)
+        Args:
+            input_dim:
+                Size of input layer.
+            compress_dims:
+                Size of each layer.
+            embedding_dim:
+                Size of latent space.
+            activation_fun_name:
+                Name of activation function torch module. Default is "ReLU".
+            dropout_rate:
+                Fraction of elements to zero between activations. Default is
+                0.5.
+            num_output_params:
+                Number of parameters of output distribution. For example,
+                for a Bernoulli distribution, this number would be 1; 2 for a
+                Gaussian; or 3 for a Student's t-distribution. Default is 2.
         """
         super().__init__()
 
@@ -78,6 +78,32 @@ class SimpleBimodalDecoder(SimpleDecoder):
         dropout_rate: float = 0.5,
         num_output_params: tuple[int, int] = (1, 2),
     ) -> None:
+        """Parametrize p(x|z). Note that x is bimodal, having two distinct
+        distributions. The output of this network is split into the parameters
+        of each distribution.
+
+        Args:
+            input_dim:
+                Size of input layer. Input is a concatenated matrix of two
+                data modalities.
+            compress_dims:
+                Size of each layer.
+            embedding_dim:
+                Size of latent space.
+            split:
+                Index of input at which the two data modalities can be split.
+            activation_fun_name:
+                Name of activation function torch module. Default is "ReLU".
+            dropout_rate:
+                Fraction of elements to zero between activations. Default is
+                0.5.
+            num_output_params:
+                Number of parameters of each output distribution. For example,
+                for a combined Bernoulli-Gaussian distribution, the default is
+                (1, 2).
+        """
+        if len(num_output_params) != 2:
+            raise ValueError("Specify # output parameters of two distributions.")
         total_output_params = (
             split * num_output_params[0] + (input_dim - split) * num_output_params[1]
         )

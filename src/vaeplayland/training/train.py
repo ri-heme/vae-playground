@@ -13,9 +13,8 @@ from vaeplayland.config.logging import log_config
 def train(config: DictConfig) -> None:
     """Train a model using the given configuration.
 
-    Parameters
-    ----------
-    config : DictConfig
+    Args:
+        config: A dict config
     """
     train_dataloader: DataLoader = hydra.utils.instantiate(config.data.train_dataloader)
     model: pl.LightningModule = hydra.utils.instantiate(config.model)

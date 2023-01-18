@@ -29,30 +29,26 @@ class VAE(nn.Module):
         return x_loc, x_scale, z, z_loc, z_scale
 
     def encode(self, x: torch.Tensor) -> tuple[torch.Tensor, ...]:
-        """Parameterizes q(z|x), a Gaussian distribution.
+        """Parameterize q(z|x), a Gaussian distribution.
 
-        Parameters
-        ----------
-        x : torch.Tensor
+        Args:
+            x: Input data
 
-        Returns
-        -------
-        z_loc, z_scale : tuple[torch.Tensor, ...]
+        Returns:
+            The location and scale of z, a compressed representation of x
         """
         z_loc, z_log_var = self.encoder(x)
         z_scale = torch.exp(0.5 * z_log_var)
         return z_loc, z_scale
 
     def decode(self, z: torch.Tensor) -> tuple[torch.Tensor, ...]:
-        """Parameterizes p(x|z), a Gaussian distribution.
+        """Parameterize p(x|z), a Gaussian distribution.
 
-        Parameters
-        ----------
-        z : torch.Tensor
+        Args:
+            z: Compressed representation of x
 
-        Returns
-        -------
-        x_loc, x_scale : tuple[torch.Tensor, ...]
+        Returns:
+            The location and scale of x, a decompressed representation of z
         """
         x_loc, x_log_scale = self.decoder(z)
         x_scale = torch.exp(x_log_scale)

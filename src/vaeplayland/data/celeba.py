@@ -1,7 +1,7 @@
 __all__ = ["get_dataloader"]
 
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 from torch.utils.data import DataLoader
 from torchvision import transforms as T
@@ -12,26 +12,26 @@ NORMALIZE_PARAMS = ((0.5,) * 3,) * 2
 
 
 def get_dataloader(
-    root: Optional[Path] = None, split: str = "train", **dataloader_kwargs
+    root: Optional[Path] = None,
+    split: Literal["train", "valid", "test", "all"] = "train",
+    **dataloader_kwargs
 ) -> DataLoader:
-    """Returns a dataloader for the CelebA dataset. The images are resized,
+    """Return a dataloader for the CelebA dataset. The images are resized,
     cropped, and normalized. Each image in the dataset has three channels and
     is 64 x 64 px. Additionally, each image is accompanied with 40 labels,
     corresponding to binary attributes such as mustache and 5 o'clock shadow.
 
-    Parameters
-    ----------
-    root : Path, optional
-    split : {'train', 'valid', 'test', 'all'}
+    Args:
+        root: Path to dataset's location
+        split: Split of dataset to load
 
-    Returns
-    -------
-    DataLoader
+    Raises:
+        FileNotFoundError:
+            If the CelebA dataset has not been previously downloaded
 
-    Raises
-    ------
-    FileNotFoundError
-        If the CelebA dataset has not been previously downloaded
+    Returns:
+        A dataloader constructed with the specified keyword arguments and the
+        CelebA dataset split
     """
     if root is None:
         root = Path.home() / ".pytorch"

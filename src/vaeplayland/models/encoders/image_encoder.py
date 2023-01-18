@@ -7,20 +7,16 @@ from torch import nn
 def calculate_output_shape(
     input_shape: tuple[int, int], kernel_size: int, stride: int, padding: int
 ) -> tuple[int, int]:
-    """Calculates output shape of convolutional layer.
+    """Calculate output shape of convolutional layer.
 
-    Parameters
-    ----------
-    input_shape : Tuple[int, int]
-        Width and height of input image
-    kernel_size : int
-    stride : int
-    padding : int
+    Args:
+        input_shape: Width and height of input matrix
+        kernel_size: Kernel size of convolution operation
+        stride: Stride of convolution operation
+        padding: Padding of convolution operation
 
-    Returns
-    -------
-    Tuple[int]
-        Width and height of output image
+    Returns:
+        Width and height of matrix after a convolution operation
     """
     output_shape = []
     for d in range(2):
@@ -32,16 +28,13 @@ def calculate_output_shape(
 
 class ImageEncoder(nn.Module):
     def __init__(self, input_shape: tuple[int, int], num_latent_units: int) -> None:
-        """Parametrizes q(z|x). Architecture originally described in
+        """Parameterize q(z|x). Architecture originally described in
         `Wu & Goodman (2018) <https://arxiv.org/abs/1802.05335>`_, see
         Figure 8.
 
-        Parameters
-        ----------
-        input_shape : Tuple[int, int]
-            Width and height of input image
-        num_latent_units : int
-            Size of latent space
+        Args:
+            input_shape: Width and height of input image
+            num_latent_units: Size of latent space
         """
         super().__init__()
         output_shape = calculate_output_shape(input_shape, 4, 2, 1)

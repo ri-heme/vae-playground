@@ -12,22 +12,19 @@ def flatten_config(
     ignore: Optional[list[str]] = None,
     prefixes: Optional[str] = None,
 ) -> Generator[tuple[str, Any], None, None]:
-    """Flattens a hierarchical config.
+    """Flatten a hierarchical config.
 
-    Parameters
-    ----------
-    config : MutableMapping
-    ignore : List[str], optional
-    prefixes : str, optional
+    Args:
+        config: A dict config
+        ignore: List of keys to ignore
+        prefixes: Prefix to prepend to each key
 
-    Yields
-    ------
-    Tuple[str, Any]
+    Yields:
+        A tuple of flattened key and its corresponding value
 
-    Example
-    -------
-    >>> k, v = next(flatten_config({"a": {"b": "c"}})); print(f"{k}={v}")
-    a/b=c
+    Example:
+        >>> k, v = next(flatten_config({"a": {"b": "c"}})); print(f"{k}={v}")
+        a/b
     """
     if prefixes is None:
         prefixes = ""
@@ -43,13 +40,12 @@ def flatten_config(
 def log_config(
     config: DictConfig, trainer: pl.Trainer, model: pl.LightningModule
 ) -> None:
-    """Records Hydra config.
+    """Record Hydra config.
 
-    Parameters
-    ----------
-    config : DictConfig
-    trainer : pl.Trainer
-    model : pl.LightningModule
+    Args:
+        config: A dict config
+        trainer: A PyTorch Lightning trainer instance
+        model: A Pytorch Lightning module instance
     """
     assert trainer.logger is not None
     ignore = ["logger", "valid_dataloader", "test_dataloader"]
