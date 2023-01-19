@@ -3,5 +3,5 @@
 defaults:
   - _self_
   - data: default.yaml
-  - model: vae.yaml
+  - model: image.yaml
   - trainer: default.yaml
