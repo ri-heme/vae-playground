@@ -1,7 +1,7 @@
 defaults:
-  - dataloader@train_dataloader
-  - dataloader@valid_dataloader
-  - dataloader@test_dataloader
+  - celeba_dataloader@train_dataloader
+  - celeba_dataloader@valid_dataloader
+  - celeba_dataloader@test_dataloader
 
 train_dataloader:
   split: train

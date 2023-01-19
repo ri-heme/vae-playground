@@ -2,6 +2,6 @@
 
 defaults:
   - _self_
-  - data: default.yaml
+  - data: celeba.yaml
   - model: image.yaml
   - trainer: default.yaml
