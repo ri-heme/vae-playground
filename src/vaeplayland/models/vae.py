@@ -53,3 +53,32 @@ class VAE(nn.Module):
         x_loc, x_log_scale = self.decoder(z)
         x_scale = torch.exp(x_log_scale)
         return x_loc, x_scale
+
+
+class BimodalVAE(VAE):
+    def __init__(self, encoder: nn.Module, decoder: nn.Module) -> None:
+        super().__init__(encoder, decoder)
+
+    @property
+    def split(self) -> int:
+        return getattr(self.decoder, "split")
+
+    def forward(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
+        x, _ = batch
+        z_loc, z_scale = self.encode(x)
+        z = self.reparameterize(z_loc, z_scale)
+        x_params = self.decode(z)
+        return *x_params, z, z_loc, z_scale
+
+    def decode(self, z: torch.Tensor) -> tuple[torch.Tensor, ...]:
+        """Parameterize p(x|z), a bi-modal distribution.
+
+        Args:
+            z: Compressed representation of x
+
+        Returns:
+            The parameters describing each modality of x, a decompressed
+            representation of z
+        """
+        x_params = self.decoder(z)
+        return x_params
