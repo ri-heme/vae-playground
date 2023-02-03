@@ -1,7 +1,7 @@
 __all__ = ["TrainingLogic", "PyroTrainingLogic"]
 
 import math
-from typing import Any, Literal, Sized, cast
+from typing import Any, Callable, Literal, Sized, cast
 
 import pyro
 import pyro.distributions
@@ -11,10 +11,10 @@ import pytorch_lightning as pl
 import torch
 from pyro.optim import PyroOptim
 from pytorch_lightning.trainer.states import RunningStage
-from torch import optim
+from torch import nn, optim
 
-import vaeplayland
-from vaeplayland.models.loss import compute_elbo
+from vaeplayland.models.vae import VAE, BimodalVAE
+from vaeplayland.models.loss import compute_elbo, compute_bimodal_elbo
 
 AnnealingFunction = Literal["linear", "sigmoid", "stairs"]
 
@@ -22,7 +22,7 @@ AnnealingFunction = Literal["linear", "sigmoid", "stairs"]
 class TrainingLogic(pl.LightningModule):
     def __init__(
         self,
-        vae: "vaeplayland.models.VAE",
+        vae: VAE,
         kl_weight: float = 1.0,
         annealing_epochs: int = 20,
         annealing_function: AnnealingFunction = "linear",
@@ -79,6 +79,13 @@ class TrainingLogic(pl.LightningModule):
         kl_weight: float = getattr(self.hparams, "kl_weight")
         return self.annealing_factor * kl_weight
 
+    @property
+    def loss_function(self) -> Callable[[nn.Module, tuple[torch.Tensor, ...], float], dict[str, torch.Tensor]]:
+        if isinstance(self.vae, BimodalVAE):
+            return compute_bimodal_elbo
+        else:
+            return compute_elbo
+
     def forward(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
         return self.vae(batch)
 
@@ -96,7 +103,7 @@ class TrainingLogic(pl.LightningModule):
             Negative ELBO
         """
         assert self.trainer is not None
-        output = compute_elbo(self, batch, self.kl_weight)
+        output = self.loss_function(self.vae, batch, self.kl_weight)
         for key, value in output.items():
             self.log(f"{self.trainer.state.stage}_{key}", value)
         # objetive: minimize negative ELBO
@@ -112,7 +119,7 @@ class TrainingLogic(pl.LightningModule):
 class PyroTrainingLogic(TrainingLogic):
     def __init__(
         self,
-        vae: "vaeplayland.models.VAE",
+        vae: VAE,
         kl_weight: float = 1.0,
         annealing_epochs: int = 20,
         annealing_function: AnnealingFunction = "linear",

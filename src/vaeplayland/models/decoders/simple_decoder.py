@@ -6,6 +6,17 @@ import torch
 from torch import nn
 
 
+def get_num_args(distribution_name: str) -> int:
+    if distribution_name in ("Bernoulli", "Categorical", "Exponential"):
+        return 1
+    elif distribution_name in ("Normal", "LogNormal"):
+        return 2
+    elif distribution_name == "StudentT":
+        return 3
+    else:
+        raise ValueError("Unsupported distribution")
+
+
 class SimpleDecoder(nn.Module):
     def __init__(
         self,
@@ -14,7 +25,7 @@ class SimpleDecoder(nn.Module):
         embedding_dim: int,
         activation_fun_name: str = "ReLU",
         dropout_rate: float = 0.5,
-        num_output_params: int = 2,
+        output_distribution: Union[str, int] = "Normal",
     ) -> None:
         """Parametrize p(x|z). The output is the parameters (location and
         scale) of a Gaussian distribution.
@@ -31,17 +42,20 @@ class SimpleDecoder(nn.Module):
             dropout_rate:
                 Fraction of elements to zero between activations. Default is
                 0.5.
-            num_output_params:
-                Number of parameters of output distribution. For example,
-                for a Bernoulli distribution, this number would be 1; 2 for a
-                Gaussian; or 3 for a Student's t-distribution. Default is 2.
+            output_distribution:
+                Name of output distribution (as named in torch's distributions
+                module). For example, 'Normal' or 'Categorical'. Alternatively,
+                the number of total output parameters
         """
         super().__init__()
 
-        input_dim *= num_output_params
-        self.num_output_params = num_output_params
-        if num_output_params < 1:
-            raise ValueError("Must output at least one parameter")
+        if isinstance(output_distribution, str):
+            num_output_dist_args = get_num_args(output_distribution)
+        else:
+            num_output_dist_args = output_distribution
+
+        input_dim *= num_output_dist_args
+        self.total_output_args = num_output_dist_args
 
         if not isinstance(compress_dims, Sequence):
             compress_dims = (compress_dims,)
@@ -64,19 +78,19 @@ class SimpleDecoder(nn.Module):
 
     def forward(self, batch: torch.Tensor) -> Sequence[torch.Tensor]:
         x = self.network(batch)
-        return torch.chunk(x, chunks=self.num_output_params, dim=-1)
+        return torch.chunk(x, chunks=self.total_output_args, dim=-1)
 
 
 class SimpleBimodalDecoder(SimpleDecoder):
     def __init__(
         self,
         input_dim: int,
-        compress_dims: Sequence[int],
+        compress_dims: Union[int, Sequence[int]],
         embedding_dim: int,
         split: int,
         activation_fun_name: str = "ReLU",
         dropout_rate: float = 0.5,
-        num_output_params: tuple[int, int] = (1, 2),
+        output_distributions: tuple[str, str] = ("Categorical", "Normal"),
     ) -> None:
         """Parametrize p(x|z). Note that x is bimodal, having two distinct
         distributions. The output of this network is split into the parameters
@@ -97,33 +111,36 @@ class SimpleBimodalDecoder(SimpleDecoder):
             dropout_rate:
                 Fraction of elements to zero between activations. Default is
                 0.5.
-            num_output_params:
-                Number of parameters of each output distribution. For example,
-                for a combined Bernoulli-Gaussian distribution, the default is
-                (1, 2).
+            output_distributions:
+                Distribution of each data modality. The default is 'Categorical'
+                and 'Normal'.
         """
-        if len(num_output_params) != 2:
-            raise ValueError("Specify # output parameters of two distributions.")
-        total_output_params = (
-            split * num_output_params[0] + (input_dim - split) * num_output_params[1]
+        if len(output_distributions) != 2:
+            raise ValueError("Specify only two output distributions.")
+        self.output_distributions = output_distributions
+        total_output_args = (
+            split * self.num_output_args[0]
+            + (input_dim - split) * self.num_output_args[1]
         )
-        print(total_output_params)
         super().__init__(
             1,
             compress_dims,
             embedding_dim,
             activation_fun_name,
             dropout_rate,
-            total_output_params,
+            total_output_args,
         )
         self.split = split
-        self.num_output_params = num_output_params
+
+    @property
+    def num_output_args(self) -> Sequence[int]:
+        return [get_num_args(dist) for dist in self.output_distributions]
 
     def forward(self, batch: torch.Tensor) -> Sequence[torch.Tensor]:
         x = self.network(batch)
         x_params = []
         for x_i, chunks in zip(
-            torch.tensor_split(x, [self.split], dim=-1), self.num_output_params
+            torch.tensor_split(x, [self.split], dim=-1), self.num_output_args
         ):
             if chunks > 1:
                 x_params.extend(torch.chunk(x_i, chunks=chunks, dim=-1))
