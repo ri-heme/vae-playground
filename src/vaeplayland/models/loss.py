@@ -63,7 +63,7 @@ def compute_bimodal_elbo(
     cat_rec_loss = compute_cross_entropy(y, x_logits).mean()
     con_rec_loss = compute_gaussian_log_prob(x_con, px_loc, px_log_scale.exp()).mean()
     rec_loss = cat_rec_loss + con_rec_loss
-    reg_loss = compute_kl_div(z, qz_loc, qz_scale)
+    reg_loss = compute_kl_div(z, qz_loc, qz_scale).mean()
     elbo = cat_rec_loss + con_rec_loss - kl_weight * reg_loss
     return dict(
         elbo=elbo,
