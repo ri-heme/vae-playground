@@ -102,10 +102,10 @@ class TrainingLogic(pl.LightningModule):
         Returns:
             Negative ELBO
         """
-        assert self.trainer is not None
         output = self.loss_function(self.vae, batch, self.kl_weight)
-        for key, value in output.items():
-            self.log(f"{self.trainer.state.stage}_{key}", value)
+        if self.trainer is not None:
+            for key, value in output.items():
+                self.log(f"{self.trainer.state.stage}_{key}", value)
         # objetive: minimize negative ELBO
         return -output["elbo"]
 
