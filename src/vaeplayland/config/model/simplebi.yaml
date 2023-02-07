@@ -2,14 +2,14 @@
 _target_: vaeplayland.training.wrappers.TrainingLogic
 
 vae:
-  _target_: vaeplayland.models.VAE
+  _target_: vaeplayland.models.BimodalVAE
   encoder:
     _target_: vaeplayland.models.encoders.SimpleEncoder
     input_dim: 7
-    compress_dims: 16
+    compress_dims: 32
     embedding_dim: 2
     activation_fun_name: ReLU
-    dropout_rate: 0.3
+    dropout_rate: 0.5
   decoder:
     _target_: vaeplayland.models.decoders.SimpleBimodalDecoder
     input_dim: ${model.vae.encoder.input_dim}
@@ -22,6 +22,7 @@ vae:
       - Categorical
       - Normal
 
+lr: 0.0175
 kl_weight: 1
 annealing_epochs: 20
 annealing_function: linear
