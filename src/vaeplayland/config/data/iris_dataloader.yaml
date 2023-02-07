@@ -1,4 +1,4 @@
 _target_: vaeplayland.data.iris.get_dataloader
 test_frac: 0.2
 seed: 42
-batch_size: 16
+batch_size: 10

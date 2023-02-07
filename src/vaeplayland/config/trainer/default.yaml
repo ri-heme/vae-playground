@@ -2,6 +2,7 @@ _target_: pytorch_lightning.Trainer
 
 accelerator: cpu
 
+log_every_n_steps: 10
 max_epochs: 100
 
 enable_progress_bar: False
@@ -11,7 +12,8 @@ logger:
   entity: null
   project: vae-playland
   group: celeba
-  save_dir: null
+  save_dir: outputs
 
 callbacks:
   - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+    dirpath: ./outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
