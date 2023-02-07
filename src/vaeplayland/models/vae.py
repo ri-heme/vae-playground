@@ -1,4 +1,4 @@
-__all__ = ["VAE"]
+__all__ = ["BimodalVAE", "VAE"]
 
 import torch
 from torch import nn
