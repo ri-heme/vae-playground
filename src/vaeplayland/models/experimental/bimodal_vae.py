@@ -4,8 +4,14 @@ from typing import Sequence, Union
 
 import torch
 from torch import nn
+from torch.distributions import Normal
 
 from vaeplayland.models.decoders.simple_decoder import create_decoder_network
+from vaeplayland.models.loss import (
+    compute_cross_entropy,
+    compute_gaussian_log_prob,
+    compute_kl_div,
+)
 from vaeplayland.models.vae import BimodalVAE
 
 
@@ -60,3 +66,25 @@ class ExperimentalBimodalDecoder(nn.Module):
 class ExperimentalBimodalVAE(BimodalVAE):
     def __init__(self, encoder: nn.Module, decoder: nn.Module) -> None:
         super().__init__(encoder, decoder)
+
+    def compute_loss(
+        self, batch: tuple[torch.Tensor, ...], kl_weight: float
+    ) -> dict[str, torch.Tensor]:
+        x, y = batch
+        x_logits, *x_norm_params, z, qz_loc, qz_scale = self(batch)
+        px_loc = Normal(*x_norm_params[:2]).rsample()
+        px_scale = Normal(*x_norm_params[2:]).rsample()
+        _, x_con = torch.tensor_split(x, [self.split], dim=1)
+        cat_rec_loss = compute_cross_entropy(y, x_logits).mean()
+        con_rec_loss = compute_gaussian_log_prob(x_con, px_loc, px_scale).mean()
+        rec_loss = cat_rec_loss + con_rec_loss
+        reg_loss = compute_kl_div(z, qz_loc, qz_scale).mean()
+        elbo = cat_rec_loss + con_rec_loss - kl_weight * reg_loss
+        return dict(
+            elbo=elbo,
+            reg_loss=reg_loss,
+            rec_loss=rec_loss,
+            cat_rec_loss=cat_rec_loss,
+            con_rec_loss=con_rec_loss,
+            kl_weight=torch.tensor(kl_weight),
+        )
