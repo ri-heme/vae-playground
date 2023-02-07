@@ -5,3 +5,7 @@ defaults:
   - data: celeba.yaml
   - model: image.yaml
   - trainer: default.yaml
+
+hydra:
+  searchpath:
+    - file://config/
