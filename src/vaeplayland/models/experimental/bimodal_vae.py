@@ -45,6 +45,7 @@ class ExperimentalBimodalDecoder(nn.Module):
                 Fraction of elements to zero between activations. Default is
                 0.5.
         """
+        super().__init__()
         output_dim = 4 * input_dim - 3 * split  # eq. 4 * n_norm + n_cat
 
         layers = create_decoder_network(
