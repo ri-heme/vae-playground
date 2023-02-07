@@ -6,7 +6,37 @@ import torch
 from torch import nn
 
 
+def create_decoder_network(
+    output_dim: int,
+    compress_dims: Union[int, Sequence[int]],
+    embedding_dim: int,
+    activation_fun_name: str,
+    dropout_rate: float,
+) -> list[nn.Module]:
+    """Create a decoder network that decompresses embedding dimension into
+    output dimension by layering linear functions, non-linear activations, and
+    dropout."""
+    if not isinstance(compress_dims, Sequence):
+        compress_dims = (compress_dims,)
+
+    activation_fun = getattr(nn, activation_fun_name)
+    assert issubclass(activation_fun, nn.Module)
+
+    layers = []
+    layer_dims = [*compress_dims, embedding_dim][::-1]
+    out_features = None
+    for in_features, out_features in zip(layer_dims, layer_dims[1:]):
+        layers.append(nn.Linear(in_features, out_features, bias=True))
+        layers.append(activation_fun())
+        if dropout_rate > 0:
+            layers.append(nn.Dropout(dropout_rate))
+    assert isinstance(out_features, int)
+    layers.append(nn.Linear(out_features, output_dim, bias=True))
+    return layers
+
+
 def get_num_args(distribution_name: str) -> int:
+    """Return number of parameters that describe a distribution."""
     if distribution_name in ("Bernoulli", "Categorical", "Exponential"):
         return 1
     elif distribution_name in ("Normal", "LogNormal"):
@@ -57,24 +87,10 @@ class SimpleDecoder(nn.Module):
         input_dim *= num_output_dist_args
         self.total_output_args = num_output_dist_args
 
-        if not isinstance(compress_dims, Sequence):
-            compress_dims = (compress_dims,)
-
-        activation_fun = getattr(nn, activation_fun_name)
-        assert issubclass(activation_fun, nn.Module)
-
-        layers = []
-        layer_dims = [*compress_dims, embedding_dim][::-1]
-        out_features = None
-        for in_features, out_features in zip(layer_dims, layer_dims[1:]):
-            layers.append(nn.Linear(in_features, out_features, bias=True))
-            layers.append(activation_fun())
-            if dropout_rate > 0:
-                layers.append(nn.Dropout(dropout_rate))
-        assert isinstance(out_features, int)
-        self.network = nn.Sequential(
-            *layers, nn.Linear(out_features, input_dim, bias=True)
+        layers = create_decoder_network(
+            input_dim, compress_dims, embedding_dim, activation_fun_name, dropout_rate
         )
+        self.network = nn.Sequential(*layers)
 
     def forward(self, batch: torch.Tensor) -> Sequence[torch.Tensor]:
         x = self.network(batch)
