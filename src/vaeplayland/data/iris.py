@@ -1,8 +1,8 @@
 from typing import Any, Literal
 
 import torch
-from torch.utils.data import DataLoader, TensorDataset, Subset
 from sklearn.datasets import load_iris
+from torch.utils.data import DataLoader, Subset, TensorDataset
 
 
 def get_dataloader(
