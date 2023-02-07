@@ -12,5 +12,6 @@ notebooks/
 # Environment
 .env
 
-# Hydra outputs
+# Hydra/WandB outputs
 outputs/
+wandb/
