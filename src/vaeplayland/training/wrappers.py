@@ -13,8 +13,7 @@ from pyro.optim import PyroOptim
 from pytorch_lightning.trainer.states import RunningStage
 from torch import nn, optim
 
-from vaeplayland.models.vae import VAE, BimodalVAE
-from vaeplayland.models.loss import compute_elbo, compute_bimodal_elbo
+from vaeplayland.models.vae import VAE
 
 AnnealingFunction = Literal["linear", "sigmoid", "stairs"]
 
@@ -41,7 +40,7 @@ class TrainingLogic(pl.LightningModule):
                 it reaches its full value. Set to 0 to disable KL warm-up.
             annealing_function:
                 Monotonic function used to warm-up the KL term. Can be a
-                linear, sigmoid, or stairstep schedule.
+                linear, sigmoid, or stairstep function.
             lr:
                 Learning rate of the Adam optimizer
         """
@@ -79,13 +78,6 @@ class TrainingLogic(pl.LightningModule):
         kl_weight: float = getattr(self.hparams, "kl_weight")
         return self.annealing_factor * kl_weight
 
-    @property
-    def loss_function(self) -> Callable[[nn.Module, tuple[torch.Tensor, ...], float], dict[str, torch.Tensor]]:
-        if isinstance(self.vae, BimodalVAE):
-            return compute_bimodal_elbo
-        else:
-            return compute_elbo
-
     def forward(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
         return self.vae(batch)
 
@@ -102,7 +94,7 @@ class TrainingLogic(pl.LightningModule):
         Returns:
             Negative ELBO
         """
-        output = self.loss_function(self.vae, batch, self.kl_weight)
+        output = self.vae.compute_loss(batch, self.kl_weight)
         if self.trainer is not None:
             for key, value in output.items():
                 self.log(f"{self.trainer.state.stage}_{key}", value)
