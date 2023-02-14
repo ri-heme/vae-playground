@@ -1,6 +1,6 @@
 __all__ = ["get_dataloader"]
 
-from typing import Literal
+from typing import Literal, cast
 
 import numpy as np
 import torch
@@ -21,7 +21,7 @@ def make_data(
     loc = rng.randint(5, 10, size=num_features)
     con_data = rng.normal(loc=loc, scale=1, size=(num_samples, num_features))
 
-    ids = rng.permutation(num_features)[:num_associations]
+    ids = [*range(0, num_features, num_features // num_associations)]
 
     mean = con_data[:, ids].mean(axis=0)
     std = con_data[:, ids].std(axis=0)
@@ -66,6 +66,8 @@ def get_dataloader(
     if split == "train":
         return DataLoader(Subset(dataset, train_ids), **dataloader_kwargs)
     elif split == "test":
-        return DataLoader(Subset(dataset, test_ids), **dataloader_kwargs)
+        return DataLoader(
+            Subset(dataset, cast(list[int], test_ids)), **dataloader_kwargs
+        )
 
     raise ValueError("Unsupported split")
