@@ -1,0 +1,4 @@
+_target_: vaeplayland.data.random.get_dataloader
+test_frac: 0.2
+seed: 123
+batch_size: 16

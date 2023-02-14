@@ -1,0 +1,11 @@
+defaults:
+  - random_dataloader@train_dataloader
+  - random_dataloader@test_dataloader
+
+train_dataloader:
+  split: train
+  shuffle: True
+
+test_dataloader:
+  split: test
+  batch_size: 60
