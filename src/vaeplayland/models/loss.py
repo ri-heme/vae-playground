@@ -6,8 +6,6 @@ import torch
 from torch import nn
 from torch.distributions import Categorical, Normal
 
-from vaeplayland.models.vae import BimodalVAE
-
 
 def compute_kl_div(z: torch.Tensor, qz_loc: torch.Tensor, qz_scale: torch.Tensor):
     """Compute the KL divergence between posterior q(z|x) and prior p(z). The
@@ -56,10 +54,9 @@ def compute_elbo(
 def compute_bimodal_elbo(
     model: nn.Module, batch: tuple[torch.Tensor, ...], kl_weight: float = 1.0
 ) -> dict[str, torch.Tensor]:
-    assert isinstance(model, BimodalVAE)
     x, y = batch
     x_logits, px_loc, px_log_scale, z, qz_loc, qz_scale = model(batch)
-    _, x_con = torch.tensor_split(x, [model.split], dim=1)
+    _, x_con = torch.tensor_split(x, [getattr(model, "split")], dim=1)
     cat_rec_loss = compute_cross_entropy(y, x_logits).mean()
     con_rec_loss = compute_gaussian_log_prob(x_con, px_loc, px_log_scale.exp()).mean()
     rec_loss = cat_rec_loss + con_rec_loss
