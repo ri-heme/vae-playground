@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import Literal, cast
 
 import torch
 from sklearn.datasets import load_iris
@@ -49,3 +49,31 @@ def get_dataloader(
         return DataLoader(Subset(dataset, test_ids), **dataloader_kwargs)
 
     raise ValueError("Unsupported split")
+
+
+def get_perm_dataloader(
+    split: Literal["train", "test"] = "train",
+    seed: int = 42,
+    test_frac: float = 0.2,
+    **dataloader_kwargs
+) -> DataLoader:
+    base_dataloader = get_dataloader(split, seed, test_frac, **dataloader_kwargs)
+
+    subset = cast(Subset, base_dataloader.dataset)
+    base_dataset = cast(TensorDataset, subset.dataset)
+    base_data, labels = base_dataset.tensors
+
+    num_samples = len(base_dataset)
+    generator = torch.Generator().manual_seed(seed)
+
+    con_data = base_data[:, 3:]
+    perm_cols = torch.column_stack(
+        [
+            torch.take(con_data[:, i], torch.randperm(num_samples, generator=generator))
+            for i in range(con_data.size(1))
+        ]
+    )
+    cat_data = torch.cat((base_data, perm_cols), dim=1)
+    dataset = TensorDataset(cat_data, labels)
+
+    return DataLoader(Subset(dataset, subset.indices), **dataloader_kwargs)
