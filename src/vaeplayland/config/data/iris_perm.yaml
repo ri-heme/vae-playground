@@ -1,0 +1,14 @@
+defaults:
+  - iris_dataloader@train_dataloader
+  - iris_dataloader@test_dataloader
+
+train_dataloader:
+  _target_: vaeplayland.data.iris.get_perm_dataloader
+  split: train
+  batch_size: 8
+  shuffle: True
+
+test_dataloader:
+  _target_: vaeplayland.data.iris.get_perm_dataloader
+  split: test
+  batch_size: 30
