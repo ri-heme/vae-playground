@@ -77,3 +77,29 @@ def get_perm_dataloader(
     dataset = TensorDataset(cat_data, labels)
 
     return DataLoader(Subset(dataset, subset.indices), **dataloader_kwargs)
+
+
+def get_perm_dataloader2(
+    split: Literal["train", "test"] = "train",
+    perm_feature: int = 3,
+    seed: int = 42,
+    test_frac: float = 0.2,
+    **dataloader_kwargs
+) -> DataLoader:
+    base_dataloader = get_dataloader(split, seed, test_frac, **dataloader_kwargs)
+
+    subset = cast(Subset, base_dataloader.dataset)
+    base_dataset = cast(TensorDataset, subset.dataset)
+    base_data, labels = base_dataset.tensors
+
+    num_samples = len(base_dataset)
+    generator = torch.Generator().manual_seed(seed)
+
+    con_data = base_data[:, 3:]
+    con_data[:, perm_feature] = torch.take(
+        con_data[:, perm_feature], torch.randperm(num_samples, generator=generator)
+    )
+
+    dataset = TensorDataset(torch.cat((base_data[:, :3], con_data), dim=1), labels)
+
+    return DataLoader(Subset(dataset, subset.indices), **dataloader_kwargs)
