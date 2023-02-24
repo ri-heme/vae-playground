@@ -12,6 +12,6 @@ def get_dataloader(source_dir: str, split: str = "train", **dataloader_args):
     # Get labels
     lab1 = torch.argmax(cat1, dim=1)
     # Prep dataloader
-    data = torch.cat((cat1, con), dim=0)
+    data = torch.cat((cat1, con), dim=1)
     dataset = TensorDataset(data, lab1)
     return DataLoader(dataset, **dataloader_args)
