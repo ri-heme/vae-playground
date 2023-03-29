@@ -2,8 +2,8 @@
 
 defaults:
   - _self_
-  - data: celeba.yaml
-  - model: image.yaml
+  - data: null
+  - model: null
   - trainer: default.yaml
 
 hydra:
