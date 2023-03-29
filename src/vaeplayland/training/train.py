@@ -1,5 +1,7 @@
 __all__ = ["train"]
 
+import logging
+
 import hydra
 import pytorch_lightning as pl
 from omegaconf import DictConfig
@@ -17,10 +19,11 @@ def train(config: DictConfig) -> None:
         config: A dict config
     """
     train_dataloader: DataLoader = hydra.utils.instantiate(config.data.train_dataloader)
+    valid_dataloader: DataLoader = hydra.utils.instantiate(config.data.test_dataloader)
     model: pl.LightningModule = hydra.utils.instantiate(config.model)
     trainer: pl.Trainer = hydra.utils.instantiate(config.trainer)
     log_config(config, trainer, model)
-    trainer.fit(model, train_dataloader)
+    trainer.fit(model, train_dataloader, valid_dataloader)
     if trainer.logger is not None:
         if isinstance(trainer.logger, WandbLogger):
             import wandb
