@@ -1,10 +1,22 @@
 __all__ = ["compute_elbo"]
 
-from typing import Optional
+from typing import Optional, TypedDict, Union
 
 import torch
 from torch import nn
 from torch.distributions import Categorical, Normal
+
+
+class ELBODict(TypedDict):
+    elbo: torch.Tensor
+    reg_loss: torch.Tensor
+    rec_loss: torch.Tensor
+    kl_weight: Union[float, torch.Tensor]
+
+
+class BimodalELBODict(ELBODict):
+    cat_rec_loss: torch.Tensor
+    con_rec_loss: torch.Tensor
 
 
 def compute_kl_div(z: torch.Tensor, qz_loc: torch.Tensor, qz_scale: torch.Tensor):
@@ -36,24 +48,24 @@ def compute_cross_entropy(x: torch.Tensor, logits: torch.Tensor) -> torch.Tensor
 
 def compute_elbo(
     model: nn.Module, batch: tuple[torch.Tensor, ...], kl_weight: float = 1.0
-) -> dict[str, torch.Tensor]:
+) -> ELBODict:
     """Compute the evidence lower bound objective."""
     x, _ = batch
     px_loc, px_scale, z, qz_loc, qz_scale = model(batch)
     rec_loss = compute_gaussian_log_prob(x, px_loc, px_scale).mean()
     reg_loss = compute_kl_div(z, qz_loc, qz_scale).mean()
     elbo = rec_loss - kl_weight * reg_loss
-    return dict(
-        elbo=elbo,
-        reg_loss=reg_loss,
-        rec_loss=rec_loss,
-        kl_weight=torch.tensor(kl_weight),
-    )
+    return {
+        "elbo": elbo,
+        "reg_loss": reg_loss,
+        "rec_loss": rec_loss,
+        "kl_weight": kl_weight,
+    }
 
 
 def compute_bimodal_elbo(
     model: nn.Module, batch: tuple[torch.Tensor, ...], kl_weight: float = 1.0
-) -> dict[str, torch.Tensor]:
+) -> BimodalELBODict:
     x, y = batch
     x_logits, px_loc, px_log_scale, z, qz_loc, qz_scale = model(batch)
     _, x_con = torch.tensor_split(x, [getattr(model, "split")], dim=1)
@@ -62,11 +74,11 @@ def compute_bimodal_elbo(
     rec_loss = cat_rec_loss + con_rec_loss
     reg_loss = compute_kl_div(z, qz_loc, qz_scale).mean()
     elbo = cat_rec_loss + con_rec_loss - kl_weight * reg_loss
-    return dict(
-        elbo=elbo,
-        reg_loss=reg_loss,
-        rec_loss=rec_loss,
-        cat_rec_loss=cat_rec_loss,
-        con_rec_loss=con_rec_loss,
-        kl_weight=torch.tensor(kl_weight),
-    )
+    return {
+        "elbo": elbo,
+        "reg_loss": reg_loss,
+        "rec_loss": rec_loss,
+        "cat_rec_loss": cat_rec_loss,
+        "con_rec_loss": con_rec_loss,
+        "kl_weight": kl_weight,
+    }
