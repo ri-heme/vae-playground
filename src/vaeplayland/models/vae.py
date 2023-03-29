@@ -4,7 +4,7 @@ import torch
 from torch import nn
 from torch.distributions import Normal
 
-from vaeplayland.models.loss import compute_bimodal_elbo, compute_elbo
+from vaeplayland.models.loss import ELBODict, compute_bimodal_elbo, compute_elbo
 
 
 class VAE(nn.Module):
@@ -58,7 +58,7 @@ class VAE(nn.Module):
 
     def compute_loss(
         self, batch: tuple[torch.Tensor, ...], kl_weight: float
-    ) -> dict[str, torch.Tensor]:
+    ) -> ELBODict:
         return compute_elbo(self, batch, kl_weight)
 
 
@@ -92,5 +92,5 @@ class BimodalVAE(VAE):
 
     def compute_loss(
         self, batch: tuple[torch.Tensor, ...], kl_weight: float
-    ) -> dict[str, torch.Tensor]:
+    ) -> ELBODict:
         return compute_bimodal_elbo(self, batch, kl_weight)
