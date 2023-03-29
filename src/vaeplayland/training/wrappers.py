@@ -104,7 +104,7 @@ class TrainingLogic(pl.LightningModule):
     def training_step(self, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
         return self.step(batch)
 
-    def validation_step(self, batch: tuple[torch.Tensor, ...]) -> None:
+    def validation_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int) -> None:
         self.step(batch)
 
 
