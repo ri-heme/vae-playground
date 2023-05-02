@@ -1,14 +1,19 @@
 __all__ = ["BimodalVAE", "VAE"]
 
+from typing import Generic, TypeVar
+
 import torch
 from torch import nn
 from torch.distributions import Normal
 
 from vaeplayland.models.loss import ELBODict, compute_bimodal_elbo, compute_elbo
 
+EncoderT = TypeVar("EncoderT", bound=nn.Module)
+DecoderT = TypeVar("DecoderT", bound=nn.Module)
 
-class VAE(nn.Module):
-    def __init__(self, encoder: nn.Module, decoder: nn.Module) -> None:
+
+class VAE(nn.Module, Generic[EncoderT, DecoderT]):
+    def __init__(self, encoder: EncoderT, decoder: DecoderT) -> None:
         super().__init__()
         self.encoder = encoder
         self.decoder = decoder
