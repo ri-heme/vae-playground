@@ -4,7 +4,7 @@ from typing import Optional, TypedDict, Union
 
 import torch
 from torch import nn
-from torch.distributions import Categorical, Normal
+from torch.distributions import Categorical, Normal, StudentT
 
 
 class ELBODict(TypedDict):
@@ -37,6 +37,15 @@ def compute_gaussian_log_prob(
     px = Normal(px_loc, px_scale)
     log_px: torch.Tensor = px.log_prob(x)
     return log_px.sum(dim=[*range(1, log_px.dim())])
+
+
+def compute_t_log_prob(
+    x: torch.Tensor, df: torch.Tensor, loc: torch.Tensor, scale: torch.Tensor
+) -> torch.Tensor:
+    """Compute the log of the probability density of the likelihood p(x|z)."""
+    px = StudentT(df, loc, scale)  # type: ignore
+    log_px: torch.Tensor = px.log_prob(x)
+    return log_px
 
 
 def compute_cross_entropy(x: torch.Tensor, logits: torch.Tensor) -> torch.Tensor:
