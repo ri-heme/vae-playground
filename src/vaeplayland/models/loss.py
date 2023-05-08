@@ -1,10 +1,10 @@
 __all__ = ["compute_elbo"]
 
-from typing import Optional, TypedDict, Union
+from typing import Optional, TypedDict, Union, Type
 
 import torch
 from torch import nn
-from torch.distributions import Categorical, Normal, StudentT
+from torch.distributions import Categorical, Normal, StudentT, Distribution
 
 
 class ELBODict(TypedDict):
@@ -37,6 +37,12 @@ def compute_gaussian_log_prob(
     px = Normal(px_loc, px_scale)
     log_px: torch.Tensor = px.log_prob(x)
     return log_px.sum(dim=[*range(1, log_px.dim())])
+
+
+def compute_log_prob(dist: Type, x: torch.Tensor, **dist_kwargs):
+    """Compute the log of the probability density of the likelihood p(x|z)."""
+    px: Distribution = dist(**dist_kwargs)
+    return px.log_prob(x)
 
 
 def compute_t_log_prob(
