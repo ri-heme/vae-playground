@@ -7,13 +7,14 @@ import numpy as np
 import torch
 import torch.distributions
 from torch import nn
-from torch.distributions import Exponential, Normal, StudentT, Uniform
+from torch.distributions import Exponential, Categorical, Normal, StudentT, Uniform
 from torch.distributions.constraints import Constraint
 
 from vaeplayland.models.decoders.simple_decoder import create_decoder_network
 from vaeplayland.models.encoders.simple_encoder import SimpleEncoder
 from vaeplayland.models.loss import (
     BimodalELBODict,
+    compute_log_prob,
     compute_cross_entropy,
     compute_kl_div,
     compute_t_log_prob,
@@ -223,23 +224,31 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
     def compute_loss(
         self, batch: tuple[torch.Tensor, ...], kl_weight: float
     ) -> BimodalELBODict:
+        # Split incoming data into discrete/continuous subset
         x, *_ = batch
-        x_cat, x_con = self.decoder.reshape_data(x, return_args=False)
+        x_disc, x_cont = self.decoder.reshape_data(x, return_args=False)
 
         out = cast(VAEOutput, self(batch))
 
+        # Calculate discrete reconstruction loss
         disc_rec_loss = torch.tensor(0.0)
         for i, args in enumerate(out["x_disc"]):
-            y = torch.argmax(x_cat[i], dim=-1)
-            disc_rec_loss += compute_cross_entropy(y, args["logits"]).mean()
+            y = torch.argmax(x_disc[i], dim=-1)
+            disc_rec_loss += compute_log_prob(dist=Categorical, x=y, **args).mean()
 
+        # Calculate continuous reconstruction loss
         cont_rec_loss = torch.tensor(0.0)
         for i, args in enumerate(out["x_cont"]):
-            cont_rec_loss += compute_t_log_prob(
-                x_con[i], args["df"] * 27.5 + 2.5, args["loc"], args["scale"]
+            cont_rec_loss += compute_log_prob(
+                dist=StudentT,
+                x=x_cont[i],
+                df=args["df"] * 27.5 + 2.5,
+                loc=args["loc"],
+                scale=args["scale"],
             ).mean()
-            cont_rec_loss += self.compute_prior_log_prob(x_con[i], **args)
+            cont_rec_loss += self.compute_prior_log_prob(x_cont[i], **args)
 
+        # Calculate overall reconstruction and regularization loss
         rec_loss = disc_rec_loss + cont_rec_loss
         reg_loss = compute_kl_div(out["z"], out["z_loc"], out["z_scale"]).mean()
 
