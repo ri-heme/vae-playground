@@ -14,6 +14,7 @@ from pytorch_lightning.trainer.states import RunningStage
 from torch import nn, optim
 
 from vaeplayland.models.vae import VAE
+from vaeplayland.models.loss import ELBODict
 
 AnnealingFunction = Literal["linear", "sigmoid", "stairs"]
 
@@ -85,7 +86,7 @@ class TrainingLogic(pl.LightningModule):
         lr = getattr(self.hparams, "lr")
         return optim.Adam(self.parameters(), lr=lr)
 
-    def step(self, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
+    def step(self, batch: tuple[torch.Tensor, ...]) -> ELBODict:
         """Define the logic in the training loop.
 
         Args:
@@ -99,13 +100,17 @@ class TrainingLogic(pl.LightningModule):
             for key, value in output.items():
                 self.log(f"{self.trainer.state.stage}_{key}", value)
         # objetive: minimize negative ELBO
-        return -output["elbo"]
+        return output
 
     def training_step(self, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
-        return self.step(batch)
+        output = self.step(batch)
+        return -output["elbo"]
 
     def validation_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int) -> None:
         self.step(batch)
+
+    def test_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int) -> ELBODict:
+        return self.step(batch)
 
 
 class PyroTrainingLogic(TrainingLogic):
