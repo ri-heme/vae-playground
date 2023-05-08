@@ -13,6 +13,9 @@ logger:
   project: vae-playland
   group: celeba
   save_dir: outputs
+  settings:
+    _target_: wandb.Settings
+    start_method: thread
 
 callbacks:
   - _target_: pytorch_lightning.callbacks.ModelCheckpoint
