@@ -11,6 +11,7 @@ def create_decoder_network(
     compress_dims: Union[int, Sequence[int]],
     embedding_dim: int,
     activation_fun_name: str,
+    batch_norm: bool,
     dropout_rate: float,
 ) -> list[nn.Module]:
     """Create a decoder network that decompresses embedding dimension into
@@ -30,6 +31,8 @@ def create_decoder_network(
         layers.append(activation_fun())
         if dropout_rate > 0:
             layers.append(nn.Dropout(dropout_rate))
+        if batch_norm:
+            layers.append(nn.BatchNorm1d(out_features))
     assert isinstance(out_features, int)
     layers.append(nn.Linear(out_features, output_dim, bias=True))
     return layers
@@ -54,6 +57,7 @@ class SimpleDecoder(nn.Module):
         compress_dims: Union[int, Sequence[int]],
         embedding_dim: int,
         activation_fun_name: str = "ReLU",
+        batch_norm: bool = False,
         dropout_rate: float = 0.5,
         output_distribution: Union[str, int] = "Normal",
     ) -> None:
@@ -69,6 +73,8 @@ class SimpleDecoder(nn.Module):
                 Size of latent space.
             activation_fun_name:
                 Name of activation function torch module. Default is "ReLU".
+            batch_norm:
+                Apply batch normalization.
             dropout_rate:
                 Fraction of elements to zero between activations. Default is
                 0.5.
@@ -88,7 +94,12 @@ class SimpleDecoder(nn.Module):
         self.total_output_args = num_output_dist_args
 
         layers = create_decoder_network(
-            input_dim, compress_dims, embedding_dim, activation_fun_name, dropout_rate
+            input_dim,
+            compress_dims,
+            embedding_dim,
+            activation_fun_name,
+            batch_norm,
+            dropout_rate,
         )
         self.network = nn.Sequential(*layers)
 
@@ -105,6 +116,7 @@ class SimpleBimodalDecoder(SimpleDecoder):
         embedding_dim: int,
         split: int,
         activation_fun_name: str = "ReLU",
+        batch_norm: bool = False,
         dropout_rate: float = 0.5,
         output_distributions: tuple[str, str] = ("Categorical", "Normal"),
     ) -> None:
@@ -124,6 +136,8 @@ class SimpleBimodalDecoder(SimpleDecoder):
                 Index of input at which the two data modalities can be split.
             activation_fun_name:
                 Name of activation function torch module. Default is "ReLU".
+            batch_norm:
+                Apply batch normalization.
             dropout_rate:
                 Fraction of elements to zero between activations. Default is
                 0.5.
@@ -143,6 +157,7 @@ class SimpleBimodalDecoder(SimpleDecoder):
             compress_dims,
             embedding_dim,
             activation_fun_name,
+            batch_norm,
             dropout_rate,
             total_output_args,
         )
