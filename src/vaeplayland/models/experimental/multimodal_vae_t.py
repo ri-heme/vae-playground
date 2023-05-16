@@ -12,13 +12,7 @@ from torch.distributions.constraints import Constraint
 
 from vaeplayland.models.decoders.simple_decoder import create_decoder_network
 from vaeplayland.models.encoders.simple_encoder import SimpleEncoder
-from vaeplayland.models.loss import (
-    BimodalELBODict,
-    compute_log_prob,
-    compute_cross_entropy,
-    compute_kl_div,
-    compute_t_log_prob,
-)
+from vaeplayland.models.loss import ELBODict, compute_log_prob, compute_kl_div
 from vaeplayland.models.vae import VAE
 
 
@@ -38,6 +32,12 @@ class VAEOutput(TypedDict):
     z: torch.Tensor
     z_loc: torch.Tensor
     z_scale: torch.Tensor
+
+
+class MultimodalELBODict(ELBODict):
+    disc_rec_loss: torch.Tensor
+    cont_rec_loss: torch.Tensor
+    cont_prior_loss: torch.Tensor
 
 
 DecoderOutput = tuple[list[CategoricalDistributionArgs], list[TDistributionArgs]]
@@ -60,6 +60,8 @@ class MultimodalEncoder(SimpleEncoder):
             Size of latent space.
         activation_fun_name:
             Name of activation function torch module. Default is "ReLU".
+        batch_norm:
+            Apply batch normalization.
         dropout_rate:
             Fraction of elements to zero between activations. Default is 0.5.
     """
@@ -71,12 +73,18 @@ class MultimodalEncoder(SimpleEncoder):
         compress_dims: Union[int, Sequence[int]],
         embedding_dim: int,
         activation_fun_name: str = "ReLU",
+        batch_norm: bool = False,
         dropout_rate: float = 0.5,
     ) -> None:
         disc_dims_1d = [int.__mul__(*shape) for shape in disc_dims]
         input_dim = sum(disc_dims_1d) + sum(cont_dims)
         super().__init__(
-            input_dim, compress_dims, embedding_dim, activation_fun_name, dropout_rate
+            input_dim,
+            compress_dims,
+            embedding_dim,
+            activation_fun_name,
+            batch_norm,
+            dropout_rate,
         )
 
 
@@ -99,6 +107,8 @@ class MultimodalDecoder(nn.Module):
             Size of latent space.
         activation_fun_name:
             Name of activation function torch module. Default is "ReLU".
+        batch_norm:
+            Apply batch normalization.
         dropout_rate:
             Fraction of elements to zero between activations. Default is 0.5.
     """
@@ -112,6 +122,7 @@ class MultimodalDecoder(nn.Module):
         compress_dims: Union[int, Sequence[int]],
         embedding_dim: int,
         activation_fun_name: str = "ReLU",
+        batch_norm: bool = False,
         dropout_rate: float = 0.5,
     ) -> None:
         super().__init__()
@@ -124,7 +135,12 @@ class MultimodalDecoder(nn.Module):
         output_dim = self.disc_sz + 3 * self.cont_sz
 
         layers = create_decoder_network(
-            output_dim, compress_dims, embedding_dim, activation_fun_name, dropout_rate
+            output_dim,
+            compress_dims,
+            embedding_dim,
+            activation_fun_name,
+            batch_norm,
+            dropout_rate,
         )
         self.network = nn.Sequential(*layers)
         self.distribution = StudentT
@@ -189,9 +205,9 @@ class MultimodalDecoder(nn.Module):
         for subset in cont_subsets:
             chunks = torch.chunk(subset, len(self.distribution_arg_constraints), dim=-1)
             args: TDistributionArgs = {
-                "df": torch.pow(10, chunks[0]),
+                "df": chunks[0].mul(-0.5).exp(),
                 "loc": chunks[1],
-                "scale": chunks[2].exp(),
+                "scale": chunks[2].mul(0.5).exp(),
             }
             x_cont.append(args)
         return x_disc, x_cont
@@ -223,7 +239,7 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
 
     def compute_loss(
         self, batch: tuple[torch.Tensor, ...], kl_weight: float
-    ) -> BimodalELBODict:
+    ) -> MultimodalELBODict:
         # Split incoming data into discrete/continuous subset
         x, *_ = batch
         x_disc, x_cont = self.decoder.reshape_data(x, return_args=False)
@@ -238,6 +254,7 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
 
         # Calculate continuous reconstruction loss
         cont_rec_loss = torch.tensor(0.0)
+        cont_prior_loss = torch.tensor(0.0)
         for i, args in enumerate(out["x_cont"]):
             cont_rec_loss += compute_log_prob(
                 dist=StudentT,
@@ -246,7 +263,7 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
                 loc=args["loc"],
                 scale=args["scale"],
             ).mean()
-            cont_rec_loss += self.compute_prior_log_prob(x_cont[i], **args)
+            cont_prior_loss += self.compute_prior_log_prob(x_cont[i], **args)
 
         # Calculate overall reconstruction and regularization loss
         rec_loss = disc_rec_loss + cont_rec_loss
@@ -257,8 +274,9 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
             "elbo": elbo,
             "reg_loss": reg_loss,
             "rec_loss": rec_loss,
-            "cat_rec_loss": disc_rec_loss,
-            "con_rec_loss": cont_rec_loss,
+            "disc_rec_loss": disc_rec_loss,
+            "cont_rec_loss": cont_rec_loss,
+            "cont_prior_loss": cont_prior_loss,
             "kl_weight": kl_weight,
         }
 
@@ -274,15 +292,15 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
         - df ~ Exponential(1)
         """
         with torch.no_grad():
-            mean = x.mean(dim=0)
-            std = x.std(dim=0)
+            x_mean = x.mean(dim=0)
+            x_std = x.std(dim=0)
 
         # loc ~ Normal
-        loc_prior = Normal(mean, 1e3 * std)
+        loc_prior = Normal(x_mean, 1e3 * x_std)
         log_prob = loc_prior.log_prob(loc)
 
         # scale ~ Uniform
-        log_prob += cls.scale_prior.log_prob(scale.log() - std.log())
+        log_prob += cls.scale_prior.log_prob(scale.log() - x_std.log())
 
         # df ~ Exponential
         log_prob += cls.df_prior.log_prob(df)

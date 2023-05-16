@@ -13,6 +13,7 @@ class SimpleEncoder(nn.Module):
         compress_dims: Union[int, Sequence[int]],
         embedding_dim: int,
         activation_fun_name: str = "ReLU",
+        batch_norm: bool = False,
         dropout_rate: float = 0.5,
     ) -> None:
         """Parameterize q(z|x).
@@ -26,6 +27,8 @@ class SimpleEncoder(nn.Module):
                 Size of latent space.
             activation_fun_name:
                 Name of activation function torch module. Default is "ReLU".
+            batch_norm:
+                Apply batch normalization.
             dropout_rate:
                 Fraction of elements to zero between activations. Default is
                 0.5.
@@ -46,6 +49,8 @@ class SimpleEncoder(nn.Module):
             layers.append(activation_fun())
             if dropout_rate > 0:
                 layers.append(nn.Dropout(p=dropout_rate))
+            if batch_norm:
+                layers.append(nn.BatchNorm1d(out_features))
         assert isinstance(out_features, int)
         self.network = nn.Sequential(
             *layers, nn.Linear(out_features, embedding_dim * 2, bias=True)
