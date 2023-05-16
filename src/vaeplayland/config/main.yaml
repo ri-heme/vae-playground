@@ -9,3 +9,5 @@ defaults:
 hydra:
   searchpath:
     - file://config/
+  sweep:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
