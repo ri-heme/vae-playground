@@ -1,22 +1,29 @@
 _target_: vaeplayland.training.wrappers.TrainingLogic
 
 vae:
-  _target_: vaeplayland.models.experimental.ExperimentalBimodalVAE
+  _target_: vaeplayland.models.experimental.MultimodalVAE
   encoder:
-    _target_: vaeplayland.models.encoders.SimpleEncoder
-    input_dim: 7
-    compress_dims: 32
-    embedding_dim: 2
+    _target_: vaeplayland.models.experimental.MultimodalEncoder
+    disc_dims:
+      - - 20
+        - 2
+    cont_dims:
+      - 200
+      - 1000
+    compress_dims: 1000
+    embedding_dim: 100
     activation_fun_name: ReLU
     dropout_rate: 0.5
+    batch_norm: False
   decoder:
-    _target_: vaeplayland.models.experimental.ExperimentalBimodalDecoder
-    input_dim: ${model.vae.encoder.input_dim}
+    _target_: vaeplayland.models.experimental.MultimodalDecoder
+    disc_dims: ${model.vae.encoder.disc_dims}
+    cont_dims: ${model.vae.encoder.cont_dims}
     compress_dims: ${model.vae.encoder.compress_dims}
     embedding_dim: ${model.vae.encoder.embedding_dim}
     activation_fun_name: ${model.vae.encoder.activation_fun_name}
     dropout_rate: ${model.vae.encoder.dropout_rate}
-    split: 3
+    batch_norm: ${model.vae.encoder.batch_norm}
 
 lr: 0.0175
 kl_weight: 1
