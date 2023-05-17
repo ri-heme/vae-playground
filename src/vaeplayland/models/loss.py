@@ -5,6 +5,7 @@ from typing import Optional, TypedDict, Union, Type
 import torch
 from torch import nn
 from torch.distributions import Categorical, Normal, StudentT, Distribution
+from torch.distributions.kl import kl_divergence
 
 
 class ELBODict(TypedDict):
@@ -19,13 +20,12 @@ class BimodalELBODict(ELBODict):
     con_rec_loss: torch.Tensor
 
 
-def compute_kl_div(z: torch.Tensor, qz_loc: torch.Tensor, qz_scale: torch.Tensor):
+def compute_kl_div(qz_loc: torch.Tensor, qz_scale: torch.Tensor):
     """Compute the KL divergence between posterior q(z|x) and prior p(z). The
     prior has a Normal(0, 1) distribution."""
     qz = Normal(qz_loc, qz_scale)
     pz = Normal(0.0, 1.0)
-    kl_div: torch.Tensor = qz.log_prob(z) - pz.log_prob(z)
-    return kl_div.sum(-1)
+    return kl_divergence(qz, pz).sum(dim=-1)
 
 
 def compute_gaussian_log_prob(
@@ -36,13 +36,13 @@ def compute_gaussian_log_prob(
         px_scale = torch.ones(1)
     px = Normal(px_loc, px_scale)
     log_px: torch.Tensor = px.log_prob(x)
-    return log_px.sum(dim=[*range(1, log_px.dim())])
+    return log_px.sum(dim=-1)
 
 
 def compute_log_prob(dist: Type, x: torch.Tensor, **dist_kwargs):
     """Compute the log of the probability density of the likelihood p(x|z)."""
     px: Distribution = dist(**dist_kwargs)
-    return px.log_prob(x)
+    return px.log_prob(x).sum(dim=-1)
 
 
 def compute_t_log_prob(
@@ -67,8 +67,8 @@ def compute_elbo(
     """Compute the evidence lower bound objective."""
     x, _ = batch
     px_loc, px_scale, z, qz_loc, qz_scale = model(batch)
-    rec_loss = compute_gaussian_log_prob(x, px_loc, px_scale).mean()
-    reg_loss = compute_kl_div(z, qz_loc, qz_scale).mean()
+    rec_loss = compute_log_prob(Normal, x, loc=px_loc, scale=px_scale).mean()
+    reg_loss = compute_kl_div(qz_loc, qz_scale).mean()
     elbo = rec_loss - kl_weight * reg_loss
     return {
         "elbo": elbo,
@@ -87,7 +87,7 @@ def compute_bimodal_elbo(
     cat_rec_loss = compute_cross_entropy(y, x_logits).mean()
     con_rec_loss = compute_gaussian_log_prob(x_con, px_loc, px_log_scale.exp()).mean()
     rec_loss = cat_rec_loss + con_rec_loss
-    reg_loss = compute_kl_div(z, qz_loc, qz_scale).mean()
+    reg_loss = compute_kl_div(qz_loc, qz_scale).mean()
     elbo = cat_rec_loss + con_rec_loss - kl_weight * reg_loss
     return {
         "elbo": elbo,

@@ -31,7 +31,7 @@ class ExperimentalMultimodalEncoder(SimpleEncoder):
         cat_shapes_1d = [int.__mul__(*shape) for shape in categorical_shapes]
         input_dim = sum(cat_shapes_1d) + sum(continuous_shapes)
         super().__init__(
-            input_dim, compress_dims, embedding_dim, activation_fun_name, dropout_rate
+            input_dim, compress_dims, embedding_dim, activation_fun_name, False, dropout_rate
         )
 
 
@@ -73,7 +73,7 @@ class ExperimentalMultimodalDecoder(nn.Module):
         output_dim = self.cat_sz + 4 * self.con_sz
 
         layers = create_decoder_network(
-            output_dim, compress_dims, embedding_dim, activation_fun_name, dropout_rate
+            output_dim, compress_dims, embedding_dim, activation_fun_name, False, dropout_rate
         )
         self.network = nn.Sequential(*layers)
 
@@ -147,7 +147,7 @@ class ExperimentalMultimodalVAE(BimodalVAE):
             con_rec_loss += compute_gaussian_log_prob(x_con[i], loc, scale).mean()
 
         rec_loss = cat_rec_loss + con_rec_loss
-        reg_loss = compute_kl_div(z, qz_loc, qz_scale).mean()
+        reg_loss = compute_kl_div(qz_loc, qz_scale).mean()
 
         elbo = cat_rec_loss + con_rec_loss - kl_weight * reg_loss
         return {
