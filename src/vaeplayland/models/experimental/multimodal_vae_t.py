@@ -254,7 +254,10 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
 
         # Calculate continuous reconstruction loss
         cont_rec_loss = torch.tensor(0.0)
-        cont_prior_loss = torch.tensor(0.0)
+
+        cont_prior_loss_loc = torch.tensor(0.0)
+        cont_prior_loss_scale = torch.tensor(0.0)
+        cont_prior_loss_df = torch.tensor(0.0)
         for i, args in enumerate(out["x_cont"]):
             cont_rec_loss += compute_log_prob(
                 dist=StudentT,
@@ -263,13 +266,18 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
                 loc=args["loc"],
                 scale=args["scale"],
             ).mean()
-            cont_prior_loss += self.compute_prior_log_prob(x_cont[i], **args)
+            loc_loss, scale_loss, df_loss = self.compute_prior_log_prob(x_cont[i], **args)
+            cont_prior_loss_loc += loc_loss.mean()
+            cont_prior_loss_scale += scale_loss.mean()
+            cont_prior_loss_df += df_loss.mean()
+
+        cont_prior_loss = cont_prior_loss_loc + cont_prior_loss_scale + cont_prior_loss_df
 
         # Calculate overall reconstruction and regularization loss
         rec_loss = disc_rec_loss + cont_rec_loss
-        reg_loss = compute_kl_div(out["z"], out["z_loc"], out["z_scale"]).mean()
+        reg_loss = compute_kl_div(out["z_loc"], out["z_scale"]).mean()
 
-        elbo = disc_rec_loss + cont_rec_loss - kl_weight * reg_loss
+        elbo = disc_rec_loss + cont_rec_loss + cont_prior_loss - kl_weight * reg_loss
         return {
             "elbo": elbo,
             "reg_loss": reg_loss,
@@ -277,32 +285,34 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
             "disc_rec_loss": disc_rec_loss,
             "cont_rec_loss": cont_rec_loss,
             "cont_prior_loss": cont_prior_loss,
+            "cont_prior_loss_loc": cont_prior_loss_loc,
+            "cont_prior_loss_scale": cont_prior_loss_scale,
+            "cont_prior_loss_df": cont_prior_loss_df,
             "kl_weight": kl_weight,
         }
 
     @classmethod
     def compute_prior_log_prob(
-        cls, x: torch.Tensor, df: torch.Tensor, loc: torch.Tensor, scale: torch.Tensor
+        cls, x: torch.Tensor, df: torch.Tensor, loc: torch.Tensor, scale: torch.Tensor, eps: float = 1e-3
     ) -> torch.Tensor:
         """Compute log probability density of estimated args fitting broad
         priors:
 
-        - loc ~ Normal(x_mean, 1e3 * x_std)
-        - log (scale / x_std) ~ Uniform(log 1e-3, log 1e3)
+        - loc ~ Normal(batch_mean, 1e3 * (batch_std + eps))
+        - log (scale / (batch_std + eps)) ~ Uniform(log 1e-3, log 1e3)
         - df ~ Exponential(1)
         """
-        with torch.no_grad():
-            x_mean = x.mean(dim=0)
-            x_std = x.std(dim=0)
+        batch_mean = x.detach().mean(dim=0)
+        batch_std = x.detach().std(dim=0, unbiased=False) + eps
 
         # loc ~ Normal
-        loc_prior = Normal(x_mean, 1e3 * x_std)
-        log_prob = loc_prior.log_prob(loc)
+        loc_prior = Normal(batch_mean, 1e3 * batch_std)
+        loc_log_prob = loc_prior.log_prob(loc).sum(-1)
 
         # scale ~ Uniform
-        log_prob += cls.scale_prior.log_prob(scale.log() - x_std.log())
+        scale_log_prob = cls.scale_prior.log_prob(scale.log() - batch_std.log()).sum(-1)
 
         # df ~ Exponential
-        log_prob += cls.df_prior.log_prob(df)
+        df_log_prob = cls.df_prior.log_prob(df).sum(-1)
 
-        return log_prob.mean(dim=0).sum()
+        return loc_log_prob, scale_log_prob, df_log_prob
