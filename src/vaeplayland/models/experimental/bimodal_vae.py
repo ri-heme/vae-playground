@@ -81,9 +81,9 @@ class ExperimentalBimodalVAE(BimodalVAE):
             x_con, px_loc, px_log_scale.exp()
         ).mean()
         rec_loss = cat_rec_loss + con_rec_loss
-        reg_loss = compute_kl_div(z, qz_loc, qz_scale).mean()
-        reg_loss += compute_kl_div(px_loc, *x_norm_params[:2]).mean()
-        reg_loss += compute_kl_div(px_log_scale, *x_norm_params[2:]).mean()
+        reg_loss = compute_kl_div(qz_loc, qz_scale).mean()
+        reg_loss += compute_kl_div(*x_norm_params[:2]).mean()
+        reg_loss += compute_kl_div(*x_norm_params[2:]).mean()
         elbo = cat_rec_loss + con_rec_loss - kl_weight * reg_loss
         return dict(
             elbo=elbo,
