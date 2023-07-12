@@ -1,7 +1,7 @@
 __all__ = ["TrainingLogic", "PyroTrainingLogic"]
 
 import math
-from typing import Any, Callable, Literal, Sized, cast
+from typing import Any, Literal, Sized, cast
 
 import pyro
 import pyro.distributions
@@ -16,7 +16,8 @@ from torch import nn, optim
 from vaeplayland.models.vae import VAE
 from vaeplayland.models.loss import ELBODict
 
-AnnealingFunction = Literal["linear", "sigmoid", "stairs"]
+AnnealingFunction = Literal["linear", "cosine", "sigmoid", "stairs"]
+AnnealingSchedule = Literal["monotonic", "cyclical"]
 
 
 class TrainingLogic(pl.LightningModule):
@@ -26,6 +27,7 @@ class TrainingLogic(pl.LightningModule):
         kl_weight: float = 1.0,
         annealing_epochs: int = 20,
         annealing_function: AnnealingFunction = "linear",
+        annealing_schedule: AnnealingSchedule = "monotonic",
         lr: float = 1e-4,
     ) -> None:
         """Encapsulate the training loop logic.
@@ -42,42 +44,73 @@ class TrainingLogic(pl.LightningModule):
             annealing_function:
                 Monotonic function used to warm-up the KL term. Can be a
                 linear, sigmoid, or stairstep function.
+            annealing_schedule:
+                Whether the KL term warm-up will be cyclical or monotonic.
             lr:
                 Learning rate of the Adam optimizer
         """
         super().__init__()
         self.vae = vae
         self.save_hyperparameters(ignore="vae")
+        self.fixed_kl_weight = False
+
+    @property
+    def annealing_epochs(self) -> int:
+        return getattr(self.hparams, "annealing_epochs")
+
+    @property
+    def annealing_function(self) -> AnnealingFunction:
+        return getattr(self.hparams, "annealing_function")
+
+    @property
+    def annealing_schedule(self) -> AnnealingSchedule:
+        return getattr(self.hparams, "annealing_schedule")
 
     @property
     def annealing_factor(self) -> float:
-        epoch = self.current_epoch
-        annealing_epochs: int = getattr(self.hparams, "annealing_epochs")
-        annealing_function: str = getattr(self.hparams, "annealing_function")
         if (
             self.trainer is not None
             and self.trainer.state.stage == RunningStage.TRAINING
-            and epoch < annealing_epochs
         ):
-            if annealing_function == "stairs":
-                return epoch / annealing_epochs
-            num_batches = len(cast(Sized, self.trainer.train_dataloader))
-            step = self.global_step
-            slope = 1 / (annealing_epochs * num_batches)
-            if annealing_function == "sigmoid":
-                # actual slope is 10 times slope of linear function
-                # shift is half of the annealing epochs
-                # equation below is factorized to avoid repeating terms
-                shift = 0.5
-                return 1 / (1 + math.exp(10 * (shift - step * slope)))
-            elif annealing_function == "linear":
-                return max(1e-8, step * slope)  # Pyro won't accept zero
+            epoch = self.current_epoch
+            if (
+                self.annealing_schedule == "monotonic" and epoch < self.annealing_epochs
+            ) or (self.annealing_schedule == "cyclical"):
+                if self.annealing_function == "stairs":
+                    num_epochs_cyc = self.trainer.max_epochs / self.num_cycles
+                    # location in cycle: 0 (start) - 1 (end)
+                    loc = (epoch % math.ceil(num_epochs_cyc)) / num_epochs_cyc
+                    # first half of the cycle, KL weight is warmed up
+                    # second half, it is fixed
+                    if loc <= 0.5:
+                        return loc * 2
+                else:
+                    max_steps = self.trainer.estimated_stepping_batches
+                    num_steps_cyc = max_steps / self.num_cycles
+                    step = self.global_step
+                    loc = (step % math.ceil(num_steps_cyc)) / num_steps_cyc
+                    if loc < 0.5:
+                        if self.annealing_function == "linear":
+                            return loc * 2
+                        elif self.annealing_function == "sigmoid":
+                            # ensure it reaches 0.5 at 1/4 of the cycle
+                            shift = 0.25
+                            slope = self.annealing_epochs
+                            return 1 / (1 + math.exp(slope * (shift - loc)))
+                        elif self.annealing_function == "cosine":
+                            return math.cos((loc - 0.5) * math.pi)
         return 1.0
 
     @property
     def kl_weight(self) -> float:
         kl_weight: float = getattr(self.hparams, "kl_weight")
         return self.annealing_factor * kl_weight
+
+    @property
+    def num_cycles(self) -> float:
+        if self.trainer is None:
+            return float("-inf")
+        return self.trainer.max_epochs / (self.annealing_epochs * 2)
 
     def forward(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
         return self.vae(batch)
@@ -98,7 +131,7 @@ class TrainingLogic(pl.LightningModule):
         output = self.vae.compute_loss(batch, self.kl_weight)
         if self.trainer is not None:
             for key, value in output.items():
-                self.log(f"{self.trainer.state.stage}_{key}", value)
+                self.log(f"{self.trainer.state.stage}_{key}", cast(torch.Tensor, value))
         # objetive: minimize negative ELBO
         return output
 
@@ -140,7 +173,7 @@ class PyroTrainingLogic(TrainingLogic):
             lr:
                 Learning rate of the Adam optimizer
         """
-        super().__init__(vae, kl_weight, annealing_epochs, annealing_function, lr)
+        super().__init__(vae, kl_weight, annealing_epochs, annealing_function, "monotonic", lr)
         self.optimizer = PyroOptim(optim.Adam, dict(lr=lr))
         self.svi = pyro.infer.SVI(
             self.model, self.guide, self.optimizer, pyro.infer.Trace_ELBO()
