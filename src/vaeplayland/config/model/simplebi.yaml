@@ -26,3 +26,4 @@ lr: 0.0175
 kl_weight: 1
 annealing_epochs: 20
 annealing_function: linear
+annealing_schedule: monotonic
