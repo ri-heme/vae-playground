@@ -22,6 +22,7 @@ def make_data(
     con_data = rng.normal(loc=loc, scale=1, size=(num_samples, num_features))
 
     ids = [*range(0, num_features, num_features // num_associations)]
+    assert len(ids) == num_associations
 
     mean = con_data[:, ids].mean(axis=0)
     std = con_data[:, ids].std(axis=0)

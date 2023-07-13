@@ -223,6 +223,14 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
 
     def __init__(self, encoder: MultimodalEncoder, decoder: MultimodalDecoder) -> None:
         super().__init__(encoder, decoder)
+        self.running_mean: torch.Tensor
+        self.running_std: torch.Tensor
+        self.register_buffer(
+            "running_mean", torch.zeros(self.decoder.cont_sz, dtype=torch.float)
+        )
+        self.register_buffer(
+            "running_std", torch.ones(self.decoder.cont_sz, dtype=torch.float)
+        )
 
     def forward(self, batch: tuple[torch.Tensor, ...]) -> VAEOutput:
         x, *_ = batch
@@ -254,11 +262,15 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
 
         # Calculate continuous reconstruction loss
         cont_rec_loss = torch.tensor(0.0)
+        cont_prior_loss = torch.tensor(0.0)
 
-        cont_prior_loss_loc = torch.tensor(0.0)
-        cont_prior_loss_scale = torch.tensor(0.0)
-        cont_prior_loss_df = torch.tensor(0.0)
-        for i, args in enumerate(out["x_cont"]):
+        split_indices = np.cumsum(self.decoder.cont_dims)[:-1].tolist()
+        running_means = torch.tensor_split(self.running_mean, split_indices, dim=-1)
+        running_stds = torch.tensor_split(self.running_std, split_indices, dim=-1)
+
+        for i, (args, running_mean, running_std) in enumerate(
+            zip(out["x_cont"], running_means, running_stds)
+        ):
             cont_rec_loss += compute_log_prob(
                 dist=StudentT,
                 x=x_cont[i],
@@ -266,20 +278,13 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
                 loc=args["loc"],
                 scale=args["scale"],
             ).mean()
-            loc_loss, scale_loss, df_loss = self.compute_prior_log_prob(
-                x_cont[i], **args
+            cont_prior_loss += self.compute_prior_log_prob(
+                x_cont[i], running_mean=running_mean, running_std=running_std, **args
             )
-            cont_prior_loss_loc += loc_loss.mean()
-            cont_prior_loss_scale += scale_loss.mean()
-            cont_prior_loss_df += df_loss.mean()
-
-        cont_prior_loss = (
-            cont_prior_loss_loc + cont_prior_loss_scale + cont_prior_loss_df
-        )
 
         # Calculate overall reconstruction and regularization loss
         rec_loss = disc_rec_loss + cont_rec_loss
-        reg_loss = compute_kl_div(out["z_loc"], out["z_scale"]).mean()
+        reg_loss = compute_kl_div(out["z"], out["z_loc"], out["z_scale"]).mean()
 
         elbo = disc_rec_loss + cont_rec_loss + cont_prior_loss - kl_weight * reg_loss
         return {
@@ -289,9 +294,6 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
             "disc_rec_loss": disc_rec_loss,
             "cont_rec_loss": cont_rec_loss,
             "cont_prior_loss": cont_prior_loss,
-            "cont_prior_loss_loc": cont_prior_loss_loc,
-            "cont_prior_loss_scale": cont_prior_loss_scale,
-            "cont_prior_loss_df": cont_prior_loss_df,
             "kl_weight": kl_weight,
         }
 
@@ -299,11 +301,13 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
     def compute_prior_log_prob(
         cls,
         x: torch.Tensor,
+        running_mean: torch.Tensor,
+        running_std: torch.Tensor,
         df: torch.Tensor,
         loc: torch.Tensor,
         scale: torch.Tensor,
         eps: float = 1e-3,
-    ) -> tuple:
+    ) -> torch.Tensor:
         """Compute log probability density of estimated args fitting broad
         priors:
 
@@ -314,14 +318,17 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
         batch_mean = x.detach().mean(dim=0)
         batch_std = x.detach().std(dim=0, unbiased=False) + eps
 
+        running_mean += 0.01 * (batch_mean.detach() - running_mean)
+        running_std += 0.01 * (batch_std.detach() - running_std)
+
         # loc ~ Normal
-        loc_prior = Normal(batch_mean, 1e3 * batch_std)
-        loc_log_prob = loc_prior.log_prob(loc).sum(-1)
+        loc_prior = Normal(running_mean, 1e3 * running_std)
+        log_prob = loc_prior.log_prob(loc)
 
         # scale ~ Uniform
-        scale_log_prob = cls.scale_prior.log_prob(scale.log() - batch_std.log()).sum(-1)
+        log_prob += cls.scale_prior.log_prob(scale.log() - running_std.log())
 
         # df ~ Exponential
-        df_log_prob = cls.df_prior.log_prob(df).sum(-1)
+        log_prob += cls.df_prior.log_prob(df)
 
-        return loc_log_prob, scale_log_prob, df_log_prob
+        return log_prob.mean(dim=0).sum()

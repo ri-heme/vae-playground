@@ -17,3 +17,4 @@ vae:
 kl_weight: 1
 annealing_epochs: 20
 annealing_function: linear
+annealing_schedule: monotonic

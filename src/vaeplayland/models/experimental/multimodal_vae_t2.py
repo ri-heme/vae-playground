@@ -1,14 +1,22 @@
 __all__ = []
 
-from math import log
+from math import log, pi, sqrt
 from typing import Literal, Sequence, TypedDict, Union, cast, overload
 
 import numpy as np
 import torch
 import torch.distributions
 from torch import nn
-from torch.distributions import Categorical, Exponential, Normal, StudentT, Uniform
+from torch.distributions import (
+    Categorical,
+    Exponential,
+    HalfNormal,
+    Normal,
+    StudentT,
+    Uniform,
+)
 from torch.distributions.constraints import Constraint
+from torch.distributions.kl import kl_divergence
 
 from vaeplayland.models.decoders.simple_decoder import create_decoder_network
 from vaeplayland.models.encoders.simple_encoder import SimpleEncoder
@@ -20,16 +28,16 @@ class CategoricalDistributionArgs(TypedDict):
     logits: torch.Tensor
 
 
-class TDistributionArgs(TypedDict):
-    df: torch.Tensor
-    loc: torch.Tensor
-    scale: torch.Tensor
+class DistributionArgs(TypedDict):
+    df_rate: torch.Tensor
+    loc_loc: torch.Tensor
+    loc_scale: torch.Tensor
+    scale_scale: torch.Tensor
 
 
 class VAEOutput(TypedDict):
     x_disc: list[CategoricalDistributionArgs]
-    x_cont: list[TDistributionArgs]
-    z: torch.Tensor
+    x_cont: list[DistributionArgs]
     z_loc: torch.Tensor
     z_scale: torch.Tensor
 
@@ -37,13 +45,16 @@ class VAEOutput(TypedDict):
 class MultimodalELBODict(ELBODict):
     disc_rec_loss: torch.Tensor
     cont_rec_loss: torch.Tensor
-    cont_prior_loss: torch.Tensor
+    kl_loss: torch.Tensor
+    kl_loc: torch.Tensor
+    kl_scale: torch.Tensor
+    kl_df: torch.Tensor
 
 
-DecoderOutput = tuple[list[CategoricalDistributionArgs], list[TDistributionArgs]]
+DecoderOutput = tuple[list[CategoricalDistributionArgs], list[DistributionArgs]]
 
 
-class MultimodalEncoder(SimpleEncoder):
+class MultimodalEncoderV2(SimpleEncoder):
     """Parameterize q(z|x). Note that x is multimodal, having a discrete and a
     continuous part.
 
@@ -88,7 +99,7 @@ class MultimodalEncoder(SimpleEncoder):
         )
 
 
-class MultimodalDecoder(nn.Module):
+class MultimodalDecoderV2(nn.Module):
     """Parameterize p(x|z). Note that x is multimodal, having multiple distinct
     distributions. The output of this network is split into the parameters of
     each distribution (a Categorical for each categorical dataset and a
@@ -132,7 +143,7 @@ class MultimodalDecoder(nn.Module):
         self.disc_sz = sum(self.disc_dims_1d)
         self.cont_sz = sum(cont_dims)
 
-        output_dim = self.disc_sz + 3 * self.cont_sz
+        output_dim = self.disc_sz + 4 * self.cont_sz
 
         layers = create_decoder_network(
             output_dim,
@@ -195,19 +206,20 @@ class MultimodalDecoder(nn.Module):
             cont_subsets = torch.tensor_split(cont_subset, split_indices, dim=-1)
             return x_disc, cont_subsets
 
-        split_indices = np.cumsum(
-            np.multiply(self.cont_dims, len(self.distribution_arg_constraints))
-        )[:-1].tolist()
+        num_chunks = 4
+
+        split_indices = np.cumsum(np.multiply(self.cont_dims, num_chunks))[:-1].tolist()
         cont_subsets = torch.tensor_split(cont_subset, split_indices, dim=-1)
 
         # Transform distribution args to meet support
-        x_cont: list[TDistributionArgs] = []
+        x_cont: list = []
         for subset in cont_subsets:
-            chunks = torch.chunk(subset, len(self.distribution_arg_constraints), dim=-1)
-            args: TDistributionArgs = {
-                "df": chunks[0].mul(-0.5).exp(),
-                "loc": chunks[1],
-                "scale": chunks[2].mul(0.5).exp(),
+            chunks = torch.chunk(subset, num_chunks, dim=-1)
+            args = {
+                "df_rate": chunks[0].mul(-0.5).exp(),
+                "loc_loc": chunks[1],
+                "loc_scale": chunks[2].mul(0.5).exp(),
+                "scale_scale": chunks[3].mul(0.5).exp(),
             }
             x_cont.append(args)
         return x_disc, x_cont
@@ -217,11 +229,13 @@ class MultimodalDecoder(nn.Module):
         return self.reshape_data(x_params, return_args=True)
 
 
-class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
+class MultimodalVAEv2(VAE[MultimodalEncoderV2, MultimodalDecoderV2]):
     df_prior = Exponential(1.0)
     scale_prior = Uniform(log(1e-3), log(1e3), validate_args=False)
 
-    def __init__(self, encoder: MultimodalEncoder, decoder: MultimodalDecoder) -> None:
+    def __init__(
+        self, encoder: MultimodalEncoderV2, decoder: MultimodalDecoderV2
+    ) -> None:
         super().__init__(encoder, decoder)
 
     def forward(self, batch: tuple[torch.Tensor, ...]) -> VAEOutput:
@@ -232,7 +246,6 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
         return {
             "x_disc": x_disc,
             "x_cont": x_cont,
-            "z": z,
             "z_loc": z_loc,
             "z_scale": z_scale,
         }
@@ -255,57 +268,53 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
         # Calculate continuous reconstruction loss
         cont_rec_loss = torch.tensor(0.0)
 
-        cont_prior_loss_loc = torch.tensor(0.0)
-        cont_prior_loss_scale = torch.tensor(0.0)
-        cont_prior_loss_df = torch.tensor(0.0)
+        kl_loc = torch.tensor(0.0)
+        kl_scale = torch.tensor(0.0)
+        kl_df = torch.tensor(0.0)
         for i, args in enumerate(out["x_cont"]):
             cont_rec_loss += compute_log_prob(
                 dist=StudentT,
                 x=x_cont[i],
-                df=args["df"] * 27.5 + 2.5,
-                loc=args["loc"],
-                scale=args["scale"],
+                df=args["df_rate"].mul(27.5).add(2.5).pow(-1),
+                loc=args["loc_loc"],
+                scale=args["scale_scale"].mul(sqrt(2 / pi)),
             ).mean()
-            loc_loss, scale_loss, df_loss = self.compute_prior_log_prob(
-                x_cont[i], **args
-            )
-            cont_prior_loss_loc += loc_loss.mean()
-            cont_prior_loss_scale += scale_loss.mean()
-            cont_prior_loss_df += df_loss.mean()
+            loc_loss, scale_loss, df_loss = self.compute_kl_terms(x_cont[i], **args)
+            kl_loc += loc_loss.mean()
+            kl_scale += scale_loss.mean()
+            kl_df += df_loss.mean()
 
-        cont_prior_loss = (
-            cont_prior_loss_loc + cont_prior_loss_scale + cont_prior_loss_df
-        )
+        cont_kl_loss = kl_loc + kl_scale + kl_df
 
         # Calculate overall reconstruction and regularization loss
         rec_loss = disc_rec_loss + cont_rec_loss
         reg_loss = compute_kl_div(out["z_loc"], out["z_scale"]).mean()
 
-        elbo = disc_rec_loss + cont_rec_loss + cont_prior_loss - kl_weight * reg_loss
+        elbo = disc_rec_loss + cont_rec_loss - kl_weight * (reg_loss + cont_kl_loss)
         return {
             "elbo": elbo,
             "reg_loss": reg_loss,
             "rec_loss": rec_loss,
             "disc_rec_loss": disc_rec_loss,
             "cont_rec_loss": cont_rec_loss,
-            "cont_prior_loss": cont_prior_loss,
-            "cont_prior_loss_loc": cont_prior_loss_loc,
-            "cont_prior_loss_scale": cont_prior_loss_scale,
-            "cont_prior_loss_df": cont_prior_loss_df,
+            "kl_loss": cont_kl_loss,
+            "kl_loc": kl_loc,
+            "kl_scale": kl_scale,
+            "kl_df": kl_df,
             "kl_weight": kl_weight,
         }
 
     @classmethod
-    def compute_prior_log_prob(
+    def compute_kl_terms(
         cls,
         x: torch.Tensor,
-        df: torch.Tensor,
-        loc: torch.Tensor,
-        scale: torch.Tensor,
+        df_rate: torch.Tensor,
+        loc_loc: torch.Tensor,
+        loc_scale: torch.Tensor,
+        scale_scale: torch.Tensor,
         eps: float = 1e-3,
     ) -> tuple:
-        """Compute log probability density of estimated args fitting broad
-        priors:
+        """Compute KL of estimated args fitting broad priors:
 
         - loc ~ Normal(batch_mean, 1e3 * (batch_std + eps))
         - log (scale / (batch_std + eps)) ~ Uniform(log 1e-3, log 1e3)
@@ -315,13 +324,18 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
         batch_std = x.detach().std(dim=0, unbiased=False) + eps
 
         # loc ~ Normal
-        loc_prior = Normal(batch_mean, 1e3 * batch_std)
-        loc_log_prob = loc_prior.log_prob(loc).sum(-1)
+        q_loc = Normal(loc_loc, loc_scale)
+        p_loc = Normal(batch_mean, 10 * batch_std)
+        kl_loc = kl_divergence(q_loc, p_loc).sum(dim=-1)
 
         # scale ~ Uniform
-        scale_log_prob = cls.scale_prior.log_prob(scale.log() - batch_std.log()).sum(-1)
+        q_loc = HalfNormal(scale_scale)
+        p_loc = HalfNormal(10 * batch_std)
+        kl_scale = kl_divergence(q_loc, p_loc).sum(dim=-1)
 
         # df ~ Exponential
-        df_log_prob = cls.df_prior.log_prob(df).sum(-1)
+        q_loc = Exponential(df_rate)
+        p_loc = Exponential(1.0)
+        kl_df = kl_divergence(q_loc, p_loc).sum(dim=-1)
 
-        return loc_log_prob, scale_log_prob, df_log_prob
+        return kl_loc, kl_scale, kl_df

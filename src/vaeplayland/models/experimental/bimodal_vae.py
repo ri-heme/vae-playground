@@ -49,7 +49,12 @@ class ExperimentalBimodalDecoder(nn.Module):
         output_dim = 4 * input_dim - 3 * split  # eq. 4 * n_norm + n_cat
 
         layers = create_decoder_network(
-            output_dim, compress_dims, embedding_dim, activation_fun_name, dropout_rate
+            output_dim,
+            compress_dims,
+            embedding_dim,
+            activation_fun_name,
+            False,
+            dropout_rate,
         )
         self.network = nn.Sequential(*layers)
         self.split = split

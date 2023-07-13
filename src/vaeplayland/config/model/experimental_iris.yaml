@@ -1,0 +1,29 @@
+_target_: vaeplayland.training.wrappers.TrainingLogic
+
+vae:
+  _target_: vaeplayland.models.experimental.MultimodalVAE
+  encoder:
+    _target_: vaeplayland.models.experimental.MultimodalEncoder
+    disc_dims:
+      - - 1
+        - 3
+    cont_dims:
+      - 4
+    compress_dims: 64
+    embedding_dim: 8
+    activation_fun_name: ReLU
+    dropout_rate: 0.3
+  decoder:
+    _target_: vaeplayland.models.experimental.MultimodalDecoder
+    disc_dims: ${model.vae.encoder.disc_dims}
+    cont_dims: ${model.vae.encoder.cont_dims}
+    compress_dims: ${model.vae.encoder.compress_dims}
+    embedding_dim: ${model.vae.encoder.embedding_dim}
+    activation_fun_name: ${model.vae.encoder.activation_fun_name}
+    dropout_rate: ${model.vae.encoder.dropout_rate}
+
+lr: 0.015
+kl_weight: 1
+annealing_epochs: 25
+annealing_function: linear
+annealing_schedule: monotonic

@@ -1,0 +1,11 @@
+defaults:
+  - generic_dataloader@train_dataloader
+  - generic_dataloader@test_dataloader
+
+train_dataloader:
+  split: train
+  shuffle: True
+
+test_dataloader:
+  source_dir: ${data.train_dataloader.source_dir}
+  split: test
