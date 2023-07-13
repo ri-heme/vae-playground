@@ -1,9 +1,9 @@
 _target_: vaeplayland.training.wrappers.TrainingLogic
 
 vae:
-  _target_: vaeplayland.models.experimental.MultimodalVAE
+  _target_: vaeplayland.models.multimodal_vae.MultimodalVAE
   encoder:
-    _target_: vaeplayland.models.experimental.MultimodalEncoder
+    _target_: vaeplayland.models.encoders.multimodal_encoder.MultimodalEncoder
     disc_dims:
       - - 20
         - 2
@@ -12,11 +12,11 @@ vae:
       - 1000
     compress_dims: 1000
     embedding_dim: 100
-    activation_fun_name: ReLU
+    activation_fun_name: LeakyReLU
     dropout_rate: 0.5
     batch_norm: False
   decoder:
-    _target_: vaeplayland.models.experimental.MultimodalDecoder
+    _target_: vaeplayland.models.decoders.multimodal_decoder.MultimodalDecoder
     disc_dims: ${model.vae.encoder.disc_dims}
     cont_dims: ${model.vae.encoder.cont_dims}
     compress_dims: ${model.vae.encoder.compress_dims}
