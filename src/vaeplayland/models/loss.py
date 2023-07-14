@@ -1,10 +1,10 @@
 __all__ = ["compute_elbo"]
 
-from typing import Optional, TypedDict, Union, Type
+from typing import Optional, Type, TypedDict, Union
 
 import torch
 from torch import nn
-from torch.distributions import Categorical, Normal, StudentT, Distribution
+from torch.distributions import Categorical, Distribution, Normal, StudentT
 from torch.distributions.kl import kl_divergence
 
 
