@@ -13,8 +13,8 @@ from pyro.optim import PyroOptim
 from pytorch_lightning.trainer.states import RunningStage
 from torch import nn, optim
 
-from vaeplayland.models.vae import VAE
 from vaeplayland.models.loss import ELBODict
+from vaeplayland.models.vae import VAE
 
 AnnealingFunction = Literal["linear", "cosine", "sigmoid", "stairs"]
 AnnealingSchedule = Literal["monotonic", "cyclical"]
@@ -173,7 +173,9 @@ class PyroTrainingLogic(TrainingLogic):
             lr:
                 Learning rate of the Adam optimizer
         """
-        super().__init__(vae, kl_weight, annealing_epochs, annealing_function, "monotonic", lr)
+        super().__init__(
+            vae, kl_weight, annealing_epochs, annealing_function, "monotonic", lr
+        )
         self.optimizer = PyroOptim(optim.Adam, dict(lr=lr))
         self.svi = pyro.infer.SVI(
             self.model, self.guide, self.optimizer, pyro.infer.Trace_ELBO()
