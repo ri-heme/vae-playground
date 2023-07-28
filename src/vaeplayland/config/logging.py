@@ -1,7 +1,7 @@
 __all__ = ["log_config"]
 
 from argparse import Namespace
-from typing import Any, Generator, MutableMapping, Optional, cast
+from typing import Any, List, Generator, MutableMapping, Optional, Tuple, cast
 
 import pytorch_lightning as pl
 from omegaconf import DictConfig
