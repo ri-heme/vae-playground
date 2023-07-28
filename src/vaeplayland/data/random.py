@@ -1,6 +1,6 @@
 __all__ = ["get_dataloader"]
 
-from typing import Literal, cast
+from typing import List, Literal, cast
 
 import numpy as np
 import torch
@@ -67,7 +67,7 @@ def get_dataloader(
         return DataLoader(Subset(dataset, train_ids), **dataloader_kwargs)
     elif split == "test":
         return DataLoader(
-            Subset(dataset, cast(list[int], test_ids)), **dataloader_kwargs
+            Subset(dataset, cast(List[int], test_ids)), **dataloader_kwargs
         )
 
     raise ValueError("Unsupported split")

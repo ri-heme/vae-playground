@@ -1,12 +1,14 @@
 __all__ = ["ImageEncoder"]
 
+from typing import Tuple
+
 import torch
 from torch import nn
 
 
 def calculate_output_shape(
-    input_shape: tuple[int, int], kernel_size: int, stride: int, padding: int
-) -> tuple[int, int]:
+    input_shape: Tuple[int, int], kernel_size: int, stride: int, padding: int
+) -> Tuple[int, int]:
     """Calculate output shape of convolutional layer.
 
     Args:
@@ -27,7 +29,7 @@ def calculate_output_shape(
 
 
 class ImageEncoder(nn.Module):
-    def __init__(self, input_shape: tuple[int, int], num_latent_units: int) -> None:
+    def __init__(self, input_shape: Tuple[int, int], num_latent_units: int) -> None:
         """Parameterize q(z|x). Architecture originally described in
         `Wu & Goodman (2018) <https://arxiv.org/abs/1802.05335>`_, see
         Figure 8.
@@ -61,7 +63,7 @@ class ImageEncoder(nn.Module):
         )
         self.num_latent_units = num_latent_units
 
-    def forward(self, batch: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, batch: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         x: torch.Tensor = self.network(batch)
         loc, log_var = x.chunk(2, -1)
         return loc, log_var

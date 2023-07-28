@@ -1,6 +1,6 @@
 __all__ = ["MultimodalEncoder"]
 
-from typing import Sequence, Union
+from typing import Sequence, Tuple, Union
 
 from vaeplayland.models.encoders.simple_encoder import SimpleEncoder
 
@@ -30,7 +30,7 @@ class MultimodalEncoder(SimpleEncoder):
 
     def __init__(
         self,
-        disc_dims: Sequence[tuple[int, int]],
+        disc_dims: Sequence[Tuple[int, int]],
         cont_dims: Sequence[int],
         compress_dims: Union[int, Sequence[int]],
         embedding_dim: int,

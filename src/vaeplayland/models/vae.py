@@ -1,6 +1,6 @@
 __all__ = ["BimodalVAE", "VAE"]
 
-from typing import Generic, TypeVar
+from typing import Generic, Tuple, TypeVar
 
 import torch
 from torch import nn
@@ -28,14 +28,14 @@ class VAE(nn.Module, Generic[EncoderT, DecoderT]):
     def reparameterize(loc: torch.Tensor, scale: torch.Tensor) -> torch.Tensor:
         return Normal(loc, scale).rsample()
 
-    def forward(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
+    def forward(self, batch: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, ...]:
         x, _ = batch
         z_loc, z_scale = self.encode(x)
         z = self.reparameterize(z_loc, z_scale)
         x_loc, x_scale = self.decode(z)
         return x_loc, x_scale, z, z_loc, z_scale
 
-    def encode(self, x: torch.Tensor) -> tuple[torch.Tensor, ...]:
+    def encode(self, x: torch.Tensor) -> Tuple[torch.Tensor, ...]:
         """Parameterize q(z|x), a Gaussian distribution.
 
         Args:
@@ -48,7 +48,7 @@ class VAE(nn.Module, Generic[EncoderT, DecoderT]):
         z_scale = torch.exp(0.5 * z_log_var)
         return z_loc, z_scale
 
-    def decode(self, z: torch.Tensor) -> tuple[torch.Tensor, ...]:
+    def decode(self, z: torch.Tensor) -> Tuple[torch.Tensor, ...]:
         """Parameterize p(x|z), a Gaussian distribution.
 
         Args:
@@ -62,7 +62,7 @@ class VAE(nn.Module, Generic[EncoderT, DecoderT]):
         return x_loc, x_scale
 
     def compute_loss(
-        self, batch: tuple[torch.Tensor, ...], kl_weight: float
+        self, batch: Tuple[torch.Tensor, ...], kl_weight: float
     ) -> ELBODict:
         return compute_elbo(self, batch, kl_weight)
 
@@ -75,14 +75,14 @@ class BimodalVAE(VAE):
     def split(self) -> int:
         return getattr(self.decoder, "split")
 
-    def forward(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
+    def forward(self, batch: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, ...]:
         x, _ = batch
         z_loc, z_scale = self.encode(x)
         z = self.reparameterize(z_loc, z_scale)
         x_params = self.decode(z)
         return *x_params, z, z_loc, z_scale
 
-    def decode(self, z: torch.Tensor) -> tuple[torch.Tensor, ...]:
+    def decode(self, z: torch.Tensor) -> Tuple[torch.Tensor, ...]:
         """Parameterize p(x|z), a bi-modal distribution.
 
         Args:
@@ -96,6 +96,6 @@ class BimodalVAE(VAE):
         return x_params
 
     def compute_loss(
-        self, batch: tuple[torch.Tensor, ...], kl_weight: float
+        self, batch: Tuple[torch.Tensor, ...], kl_weight: float
     ) -> ELBODict:
         return compute_bimodal_elbo(self, batch, kl_weight)

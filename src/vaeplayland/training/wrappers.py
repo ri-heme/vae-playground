@@ -1,7 +1,7 @@
 __all__ = ["TrainingLogic", "PyroTrainingLogic"]
 
 import math
-from typing import Any, Literal, Sized, cast
+from typing import Any, Literal, Tuple, cast
 
 import pyro
 import pyro.distributions
@@ -112,14 +112,14 @@ class TrainingLogic(pl.LightningModule):
             return float("-inf")
         return self.trainer.max_epochs / (self.annealing_epochs * 2)
 
-    def forward(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
+    def forward(self, batch: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, ...]:
         return self.vae(batch)
 
     def configure_optimizers(self):
         lr = getattr(self.hparams, "lr")
         return optim.Adam(self.parameters(), lr=lr)
 
-    def step(self, batch: tuple[torch.Tensor, ...]) -> ELBODict:
+    def step(self, batch: Tuple[torch.Tensor, ...]) -> ELBODict:
         """Define the logic in the training loop.
 
         Args:
@@ -135,14 +135,14 @@ class TrainingLogic(pl.LightningModule):
         # objetive: minimize negative ELBO
         return output
 
-    def training_step(self, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
+    def training_step(self, batch: Tuple[torch.Tensor, ...]) -> torch.Tensor:
         output = self.step(batch)
         return -output["elbo"]
 
-    def validation_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int) -> None:
+    def validation_step(self, batch: Tuple[torch.Tensor, ...], batch_idx: int) -> None:
         self.step(batch)
 
-    def test_step(self, batch: tuple[torch.Tensor, ...], batch_idx: int) -> ELBODict:
+    def test_step(self, batch: Tuple[torch.Tensor, ...], batch_idx: int) -> ELBODict:
         return self.step(batch)
 
 
@@ -213,7 +213,7 @@ class PyroTrainingLogic(TrainingLogic):
     def configure_optimizers(self) -> None:
         return
 
-    def step(self, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
+    def step(self, batch: Tuple[torch.Tensor, ...]) -> torch.Tensor:
         x, _ = batch
         negative_elbo = cast(float, self.svi.step(x)) / x.size(0)
         self.log("train_elbo", -negative_elbo)

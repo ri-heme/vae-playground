@@ -1,6 +1,6 @@
 __all__ = ["MultimodalDecoder"]
 
-from typing import Literal, Sequence, TypedDict, Union, cast, overload
+from typing import List, Literal, Sequence, Tuple, TypedDict, Union, cast, overload
 
 import numpy as np
 import torch
@@ -19,7 +19,7 @@ class TDistributionArgs(TypedDict):
     scale: torch.Tensor
 
 
-DecoderOutput = tuple[list[CategoricalDistributionArgs], list[TDistributionArgs]]
+DecoderOutput = Tuple[List[CategoricalDistributionArgs], List[TDistributionArgs]]
 
 
 class MultimodalDecoder(nn.Module):
@@ -49,7 +49,7 @@ class MultimodalDecoder(nn.Module):
 
     def __init__(
         self,
-        disc_dims: Sequence[tuple[int, int]],
+        disc_dims: Sequence[Tuple[int, int]],
         cont_dims: Sequence[int],
         compress_dims: Union[int, Sequence[int]],
         embedding_dim: int,
@@ -79,7 +79,7 @@ class MultimodalDecoder(nn.Module):
     @overload
     def reshape_data(
         self, x: torch.Tensor, *, return_args: Literal[False]
-    ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+    ) -> Tuple[List[torch.Tensor], List[torch.Tensor]]:
         ...
 
     @overload
@@ -90,7 +90,7 @@ class MultimodalDecoder(nn.Module):
 
     def reshape_data(
         self, x: torch.Tensor, *, return_args: bool = True
-    ) -> Union[tuple[list[torch.Tensor], list[torch.Tensor]], DecoderOutput]:
+    ) -> Union[Tuple[List[torch.Tensor], List[torch.Tensor]], DecoderOutput]:
         """Split a tensor into the original shapes of the discrete and
         continuous datasets.
 

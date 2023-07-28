@@ -1,6 +1,6 @@
 __all__ = ["SimpleDecoder", "SimpleBimodalDecoder"]
 
-from typing import Sequence, Union
+from typing import List, Sequence, Tuple, Union
 
 import torch
 from torch import nn
@@ -13,7 +13,7 @@ def create_decoder_network(
     activation_fun_name: str,
     batch_norm: bool,
     dropout_rate: float,
-) -> list[nn.Module]:
+) -> List[nn.Module]:
     """Create a decoder network that decompresses embedding dimension into
     output dimension by layering linear functions, non-linear activations, and
     dropout."""
@@ -118,7 +118,7 @@ class SimpleBimodalDecoder(SimpleDecoder):
         activation_fun_name: str = "ReLU",
         batch_norm: bool = False,
         dropout_rate: float = 0.5,
-        output_distributions: tuple[str, str] = ("Categorical", "Normal"),
+        output_distributions: Tuple[str, str] = ("Categorical", "Normal"),
     ) -> None:
         """Parametrize p(x|z). Note that x is bimodal, having two distinct
         distributions. The output of this network is split into the parameters

@@ -1,6 +1,6 @@
 __all__ = ["compute_elbo"]
 
-from typing import Optional, Type, TypedDict, Union
+from typing import Optional, Tuple, Type, TypedDict, Union
 
 import torch
 from torch import nn
@@ -62,7 +62,7 @@ def compute_cross_entropy(x: torch.Tensor, logits: torch.Tensor) -> torch.Tensor
 
 
 def compute_elbo(
-    model: nn.Module, batch: tuple[torch.Tensor, ...], kl_weight: float = 1.0
+    model: nn.Module, batch: Tuple[torch.Tensor, ...], kl_weight: float = 1.0
 ) -> ELBODict:
     """Compute the evidence lower bound objective."""
     x, _ = batch
@@ -79,7 +79,7 @@ def compute_elbo(
 
 
 def compute_bimodal_elbo(
-    model: nn.Module, batch: tuple[torch.Tensor, ...], kl_weight: float = 1.0
+    model: nn.Module, batch: Tuple[torch.Tensor, ...], kl_weight: float = 1.0
 ) -> BimodalELBODict:
     x, y = batch
     x_logits, px_loc, px_log_scale, z, qz_loc, qz_scale = model(batch)

@@ -1,6 +1,6 @@
 __all__ = ["MultimodalVAE"]
 
-from typing import TypedDict, cast
+from typing import List, Tuple, TypedDict, cast
 
 import torch
 from torch.distributions import Categorical, StudentT
@@ -16,8 +16,8 @@ from vaeplayland.models.vae import VAE
 
 
 class MultimodalVAEOutput(TypedDict):
-    x_disc: list[CategoricalDistributionArgs]
-    x_cont: list[TDistributionArgs]
+    x_disc: List[CategoricalDistributionArgs]
+    x_cont: List[TDistributionArgs]
     z_loc: torch.Tensor
     z_scale: torch.Tensor
 
@@ -31,7 +31,7 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
     def __init__(self, encoder: MultimodalEncoder, decoder: MultimodalDecoder) -> None:
         super().__init__(encoder, decoder)
 
-    def forward(self, batch: tuple[torch.Tensor, ...]) -> MultimodalVAEOutput:
+    def forward(self, batch: Tuple[torch.Tensor, ...]) -> MultimodalVAEOutput:
         x, *_ = batch
         z_loc, z_scale = self.encode(x)
         z = self.reparameterize(z_loc, z_scale)
@@ -44,7 +44,7 @@ class MultimodalVAE(VAE[MultimodalEncoder, MultimodalDecoder]):
         }
 
     def compute_loss(
-        self, batch: tuple[torch.Tensor, ...], kl_weight: float
+        self, batch: Tuple[torch.Tensor, ...], kl_weight: float
     ) -> MultimodalELBODict:
         # Split incoming data into discrete/continuous subset
         x, *_ = batch

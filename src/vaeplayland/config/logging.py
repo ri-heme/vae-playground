@@ -9,9 +9,9 @@ from omegaconf import DictConfig
 
 def flatten_config(
     config: MutableMapping,
-    ignore: Optional[list[str]] = None,
+    ignore: Optional[List[str]] = None,
     prefixes: Optional[str] = None,
-) -> Generator[tuple[str, Any], None, None]:
+) -> Generator[Tuple[str, Any], None, None]:
     """Flatten a hierarchical config.
 
     Args:
