@@ -54,19 +54,15 @@ class TrainingLogic(pl.LightningModule):
         self.save_hyperparameters(ignore="vae")
         self.fixed_kl_weight = False
 
-    @property
     def annealing_epochs(self) -> int:
         return getattr(self.hparams, "annealing_epochs")
 
-    @property
     def annealing_function(self) -> AnnealingFunction:
         return getattr(self.hparams, "annealing_function")
 
-    @property
     def annealing_schedule(self) -> AnnealingSchedule:
         return getattr(self.hparams, "annealing_schedule")
 
-    @property
     def annealing_factor(self) -> float:
         if (
             self.trainer is not None
@@ -74,10 +70,10 @@ class TrainingLogic(pl.LightningModule):
         ):
             epoch = self.current_epoch
             if (
-                self.annealing_schedule == "monotonic" and epoch < self.annealing_epochs
+                self.annealing_schedule == "monotonic" and epoch < self.annealing_epochs()
             ) or (self.annealing_schedule == "cyclical"):
                 if self.annealing_function == "stairs":
-                    num_epochs_cyc = self.trainer.max_epochs / self.num_cycles
+                    num_epochs_cyc = self.trainer.max_epochs / self.num_cycles()
                     # location in cycle: 0 (start) - 1 (end)
                     loc = (epoch % math.ceil(num_epochs_cyc)) / num_epochs_cyc
                     # first half of the cycle, KL weight is warmed up
@@ -86,7 +82,7 @@ class TrainingLogic(pl.LightningModule):
                         return loc * 2
                 else:
                     max_steps = self.trainer.estimated_stepping_batches
-                    num_steps_cyc = max_steps / self.num_cycles
+                    num_steps_cyc = max_steps / self.num_cycles()
                     step = self.global_step
                     loc = (step % math.ceil(num_steps_cyc)) / num_steps_cyc
                     if loc < 0.5:
@@ -95,22 +91,20 @@ class TrainingLogic(pl.LightningModule):
                         elif self.annealing_function == "sigmoid":
                             # ensure it reaches 0.5 at 1/4 of the cycle
                             shift = 0.25
-                            slope = self.annealing_epochs
+                            slope = self.annealing_epochs()
                             return 1 / (1 + math.exp(slope * (shift - loc)))
                         elif self.annealing_function == "cosine":
                             return math.cos((loc - 0.5) * math.pi)
         return 1.0
 
-    @property
     def kl_weight(self) -> float:
         kl_weight: float = getattr(self.hparams, "kl_weight")
-        return self.annealing_factor * kl_weight
+        return self.annealing_factor() * kl_weight
 
-    @property
     def num_cycles(self) -> float:
         if self.trainer is None:
             return float("-inf")
-        return self.trainer.max_epochs / (self.annealing_epochs * 2)
+        return self.trainer.max_epochs / (self.annealing_epochs() * 2)
 
     def forward(self, batch: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, ...]:
         return self.vae(batch)
@@ -128,14 +122,14 @@ class TrainingLogic(pl.LightningModule):
         Returns:
             Negative ELBO
         """
-        output = self.vae.compute_loss(batch, self.kl_weight)
+        output = self.vae.compute_loss(batch, self.kl_weight())
         if self.trainer is not None:
             for key, value in output.items():
                 self.log(f"{self.trainer.state.stage}_{key}", cast(torch.Tensor, value))
         # objetive: minimize negative ELBO
         return output
 
-    def training_step(self, batch: Tuple[torch.Tensor, ...]) -> torch.Tensor:
+    def training_step(self, batch: Tuple[torch.Tensor, ...], batch_idx: int) -> torch.Tensor:
         output = self.step(batch)
         return -output["elbo"]
 
@@ -217,7 +211,7 @@ class PyroTrainingLogic(TrainingLogic):
         x, _ = batch
         negative_elbo = cast(float, self.svi.step(x)) / x.size(0)
         self.log("train_elbo", -negative_elbo)
-        self.log("train_kl_weight", self.kl_weight)
+        self.log("train_kl_weight", self.kl_weight())
         # objetive: minimize negative ELBO
         return torch.Tensor([negative_elbo])
 

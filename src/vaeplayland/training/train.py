@@ -13,7 +13,7 @@ from vaeplayland.config.logging import log_config
 from vaeplayland.models.loss import ELBODict
 
 
-@hydra.main("../config", "main", version_base=None)
+@hydra.main("../config", "main")
 def train(config: DictConfig) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
     """Train a model using the given configuration.
 
