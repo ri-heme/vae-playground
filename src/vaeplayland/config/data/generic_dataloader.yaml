@@ -1,0 +1,3 @@
+_target_: vaeplayland.data.generic.get_dataloader
+source_dir: data/
+batch_size: 64
